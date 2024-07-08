@@ -1,0 +1,7 @@
+image: /home/saleeq/catkin_ws/src/warehouse_simulation_toolkit/maps/general_map.pgm
+resolution: 0.050000
+origin: [-12.000000, -12.000000, 0.000000]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+

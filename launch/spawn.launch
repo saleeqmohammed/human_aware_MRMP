@@ -1,0 +1,42 @@
+<launch>
+<!-- add robot  -->  
+  <arg name="x_pos" default="0"/>
+  <arg name="y_pos" default="0"/>
+  <arg name="z_pos" default="0"/>  
+
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find warehouse_simulation)/urdf/pioneer3dx.xacro"/>
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model pioneer3dx -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -param robot_description" />
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" ns="/pioneer3dx" respawn="false" output="screen">
+    <param name="publish_frequency" value="40.0"/>
+  </node>
+    <!-- AMCL node for localization -->
+  <node name="amcl" pkg="amcl" type="amcl" output="screen">
+    <!-- Parameters for the particle filter -->
+    <param name="odom_model_type" value="diff"/>
+    <param name="odom_alpha1" value="0.2"/>
+    <param name="odom_alpha2" value="0.2"/>
+    <param name="odom_alpha3" value="0.2"/>
+    <param name="odom_alpha4" value="0.2"/>
+    <!-- Parameters for laser model -->
+    <param name="laser_max_beams" value="60"/>
+    <param name="laser_max_range" value="10.0"/>
+    <param name="laser_min_range" value="0.05"/>
+    <!-- Initial pose estimate -->
+    <param name="initial_pose_x" value="0.0"/>
+    <param name="initial_pose_y" value="0.0"/>
+    <param name="initial_pose_a" value="0.0"/>
+    <!-- Map parameters -->
+    <param name="map_frame" value="map"/>
+    <param name="global_frame" value="odom"/>
+    <param name="base_frame" value="base_link"/>
+    <!-- Localization update parameters -->
+    <param name="update_min_d" value="0.2"/>
+    <param name="update_min_a" value="0.5"/>
+    <param name="min_particles" value="500"/>
+    <param name="max_particles" value="2000"/>
+    <!-- Resample interval -->
+    <param name="resample_interval" value="1"/>
+    <!-- Transformation parameters -->
+    <param name="transform_tolerance" value="0.5"/>
+  </node>
+</launch>

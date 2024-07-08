@@ -1,0 +1,18 @@
+<launch>
+
+  <!-- Set environment variables for Gazebo model paths -->
+  <env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find warehouse_simulation)/models"/>
+  <env name="GAZEBO_RESOURCE_PATH" value="${GAZEBO_RESOURCE_PATH}:$(find warehouse_simulation)/models"/>
+
+  <!-- Launch Gazebo with the warehouse world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find warehouse_simulation)/worlds/warehouse.world"/>
+    <arg name="paused" value="false"/>
+    <arg name="gui" value="true"/> 
+  </include>
+ 
+  <arg name="map_file" default="$(find warehouse_simulation)/maps/general_map.yaml"/>
+  
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" respawn="false" output="screen"/>
+
+</launch>
