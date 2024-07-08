@@ -1,4 +1,4 @@
-image: /home/saleeq/catkin_ws/src/human_aware_MRMP/maps/general_map.pgm
+image: /home/saleeq/catkin_ws/src/human_aware_MRMP/maps/new_map.pgm.pgm
 resolution: 0.050000
 origin: [-12.000000, -12.000000, 0.000000]
 negate: 0

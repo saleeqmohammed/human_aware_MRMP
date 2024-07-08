@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_namespace" default=""/>
+  <arg name="x_pos" default="0"/>
+  <arg name="y_pos" default="0"/>
+  <arg name="z_pos" default="0"/>
+
+  <param name="$(arg robot_namespace)/robot_description" command="$(find xacro)/xacro $(find warehouse_simulation)/urdf/pioneer3dx.xacro"/>
+
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model $(arg robot_namespace)_pioneer3dx -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -param $(arg robot_namespace)/robot_description" />
+
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" ns="$(arg robot_namespace)" respawn="false" output="screen">
+    <param name="publish_frequency" value="40.0"/>
+  </node>
+
+  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" ns="$(arg robot_namespace)" output="log">
+    <param name="maxRange" value="10"/>
+    <param name="xmin" value="-12"/>
+    <param name="ymin" value="-12"/>
+    <param name="xmax" value="12"/>
+    <param name="ymax" value="12"/>
+    <param name="delta" value="0.05"/>
+    <param name="particles" value="4"/>
+    <param name="temporalUpdate" value="1.0"/>
+    <param name="angularUpdate" value="0.3"/>
+    <param name="linearUpdate" value="0.3"/>
+    <param name="map_update_interval" value="2.0"/>
+  </node>
+
+  <node pkg="move_base" type="move_base" name="move_base" ns="$(arg robot_namespace)" respawn="true" output="screen">
+    <rosparam file="$(find warehouse_simulation)/param/move_base_params.yaml" command="load" />
+    <rosparam file="$(find warehouse_simulation)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find warehouse_simulation)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find warehouse_simulation)/param/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find warehouse_simulation)/param/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find warehouse_simulation)/param/base_local_planner_params.yaml" command="load" />
+    <rosparam file="$(find warehouse_simulation)/param/navfn.yaml" command="load" />
+
+    <param name="global_costmap/global_frame" value="map"/>
+    <param name="global_costmap/robot_base_frame" value="base_link"/>
+    <param name="local_costmap/global_frame" value="odom"/>
+    <param name="local_costmap/robot_base_frame" value="base_link"/>
+  </node>
+
+  <node pkg="hector_trajectory_server" type="hector_trajectory_server" name="trajectory_server" ns="$(arg robot_namespace)" output="screen">
+    <param name="target_frame_name" value="map" />
+    <param name="source_frame_name" value="base_link" />
+    <param name="trajectory_update_rate" value="10.0" />
+    <param name="trajectory_publish_rate" value="10.0" />
+  </node>
+
+</launch>

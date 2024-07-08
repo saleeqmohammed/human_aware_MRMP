@@ -11,8 +11,8 @@
     <arg name="gui" value="true"/> 
   </include>
  
-  <arg name="map_file" default="$(find warehouse_simulation)/maps/general_map.yaml"/>
+  <!-- <arg name="map_file" default="$(find warehouse_simulation)/maps/general_map.yaml"/>
   
-  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" respawn="false" output="screen"/>
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" respawn="false" output="screen"/> -->
 
 </launch>
