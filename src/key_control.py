@@ -22,7 +22,7 @@ def getKey():
 
 def main():
     rospy.init_node('teleop_twist_keyboard')
-    pub = rospy.Publisher('robot_0/cmd_vel', Twist, queue_size=10)
+    pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
     speed = rospy.get_param("~speed", 0.5)
 

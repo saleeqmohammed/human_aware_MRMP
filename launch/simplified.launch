@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+
+    <!-- world , bots , humans-->
+    <arg name="world_file" default="$(find warehouse_simulation)/worlds/single_bot.world"/>
+    <node name="stageros" pkg="stage_ros" type="stageros" args="$(arg world_file)" />
+    
+     <!-- map-->
+    <arg name="map_file" default="$(find warehouse_simulation)/maps/general_map.yaml"/>
+
+    <!-- Run the map server -->
+    <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+
+</launch>

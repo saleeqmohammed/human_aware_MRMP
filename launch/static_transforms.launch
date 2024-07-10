@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Static transform for robot0 -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="robot0_tf_publisher"
+          args="0 0 0 0 0 0 1 map robot_0/base_footprint 100" />
+
+    <!-- Static transform for robot1 -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="robot1_tf_publisher"
+          args="2 0 0 0 0 0 1 map robot_1/base_footprint 100" />
+
+    <!-- Static transform for robot2 -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="robot2_tf_publisher"
+          args="0 2 0 0 0 0 1 map robot_2/base_footprint 100" />
+
+    <!-- Static transform for robot3 -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="robot3_tf_publisher"
+          args="2 2 0 0 0 0 1 map robot_3/base_footprint 100" />
+
+    <!-- Static transform for robot4 -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="robot4_tf_publisher"
+          args="2 -7 0 0 0 0 1 map robot_4/base_footprint 100" />
+
+    <!-- Static transform for robot5 -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="robot5_tf_publisher"
+          args="-6 4 0 0 0 0 1 map robot_5/base_footprint 100" />
+</launch>
+

@@ -1,0 +1,25 @@
+<launch>
+  
+  <!-- AMCL for Robot 0 -->
+  <group ns="robot_0">
+    <node name="amcl" pkg="amcl" type="amcl" output="screen">
+      <remap from="scan" to="base_scan"/>
+      <param name="base_frame_id" value="base_link_robot_0"/>
+      <param name="odom_frame_id" value="odom_robot_0"/>
+      <param name="global_frame_id" value="map"/>
+      <!-- Add other parameters as needed -->
+    </node>
+  </group>
+
+  <!-- AMCL for Robot 1 -->
+  <group ns="robot_1">
+    <node name="amcl" pkg="amcl" type="amcl" output="screen">
+      <remap from="scan" to="base_scan"/>
+      <param name="base_frame_id" value="base_link_robot_1"/>
+      <param name="odom_frame_id" value="odom_robot_1"/>
+      <param name="global_frame_id" value="map"/>
+      <!-- Add other parameters as needed -->
+    </node>
+  </group>
+
+</launch>

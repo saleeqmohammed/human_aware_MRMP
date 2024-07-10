@@ -84,6 +84,6 @@ pioneer( pose [ 0 2 0 0 ] name "robot3" color "red")
 pioneer( pose [ 2 2 0 0 ] name "robot4" color "yellow")
 
 #Define humans in the worksapce
-human( pose [ 5 0 0 0 ] name "Tom")
-human( pose [ 5 0 0 0 ] name "Dick")
-human( pose [ 5 0 0 0 ] name "Harry")
+human( pose [ 2 -7 0 0 ] name "Tom")
+human( pose [ -6 4 0 0 ] name "Dick")
+human( pose [ 8 1 0 0 ] name "Harry")
