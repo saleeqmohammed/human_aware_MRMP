@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from pysocialforce.utils import stateutils
+from .utils import stateutils
 
 
 class PedPedPotential(object):

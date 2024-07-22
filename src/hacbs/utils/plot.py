@@ -67,7 +67,7 @@ class SceneVisualizer:
         self, scene, output=None, writer="imagemagick", cmap="viridis", agent_colors=None, **kwargs
     ):
         self.scene = scene
-        self.states, self.group_states = self.scene.get_states()
+        self.states, self.group_states,self.robot_states = self.scene.get_states()
         self.cmap = cmap
         self.agent_colors = agent_colors
         self.frames = self.scene.get_length()
@@ -98,11 +98,15 @@ class SceneVisualizer:
         self.ellipse_collection = PatchCollection([])
         self.ellipse_collection.set(animated=True, alpha=0.2, edgecolors="red",linewidth=0.25, facecolors="none")
 
+        self.robot_actors=None
+        self.robot_collection = PatchCollection([])
+        self.robot_collection.set(animated=True,alpha =0.9,cmap=self.cmap,clip_on =True)
+
     def plot(self):
         """Main method for creating a static plot"""
         self.plot_obstacles()
         groups = self.group_states[0]  # static group for now
-        if not groups:
+        if not groups:       
             for ped in range(self.scene.peds.size()):
                 x = self.states[:, ped, 0]
                 y = self.states[:, ped, 1]
@@ -114,8 +118,9 @@ class SceneVisualizer:
                     x = self.states[:, ped, 0]
                     y = self.states[:, ped, 1]
                     self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5, color=colors[i])
-        self.ax.legend()
         self.plot_ellipses()
+        self.plot_robots()
+        self.ax.legend()
         return self.fig
 
     def animate(self):
@@ -173,7 +178,7 @@ class SceneVisualizer:
         :param step: index of state, default is the latest
         :return: list of patches
         """
-        states, _ = self.scene.get_states()
+        states, _,_ = self.scene.get_states()
         current_state = states[step]
         radius = [0.2] * current_state.shape[0]
         if self.human_actors:
@@ -189,13 +194,14 @@ class SceneVisualizer:
             self.human_collection.set_array(np.arange(current_state.shape[0]))
         else:
             self.human_collection.set_facecolor(self.agent_colors)
+    
 
     def plot_groups(self, step=-1):
         """Generate patches for groups
         :param step: index of state, default is the latest
         :return: list of patches
         """
-        states, group_states = self.scene.get_states()
+        states, group_states,_ = self.scene.get_states()
         current_state = states[step]
         current_groups = group_states[step]
         if self.group_actors:  # update patches, else create
@@ -216,12 +222,12 @@ class SceneVisualizer:
         :param step: index of state, default is the latest
         :return: list of patches
         """
-        states, _ = self.scene.get_states()
+        states, _ ,_ = self.scene.get_states()
         current_state = states[step]
         self.ellipse_actors.clear()
         for i, state in enumerate(current_state):
             v_ = speeds(current_state)
-            print(v_)
+            # print(v_)
             ellipse = Ellipse(
                 xy=state[:2],
                 width=0.6, #2b
@@ -232,6 +238,26 @@ class SceneVisualizer:
         self.ellipse_collection.set_paths(self.ellipse_actors)
         self.ax.add_collection(self.ellipse_collection)
 
+    def plot_robots(self,step=-1):
+        """Generate patches for robots"""
+        _,_,states = self.scene.get_states()
+        # current_state = states[step]
+        current_state = states[0]
+        radius = [0.52]*current_state.shape[0]
+        if self.robot_actors:
+            for i, robot in enumerate(self.robot_actors):
+                robot.center = current_state[i,:2]
+                robot.set_radius(0.52)
+        else:
+            self.robot_actors =[
+                Circle(pos,radius=r) for pos,r in zip(current_state[:,:2],radius)
+            ]
+        self.robot_collection.set_paths(self.robot_actors)
+        if not self.agent_colors:
+            self.robot_collection.set_array(np.arange(current_state.shape[0]))
+        else:
+            self.robot_collection.set_facecolor(self.agent_colors)
+        self.ax.add_collection(self.robot_collection)
     def animation_init(self):
         self.plot_obstacles()
         self.ax.add_collection(self.group_collection)
@@ -242,5 +268,6 @@ class SceneVisualizer:
     def animation_update(self, i):
         self.plot_groups(i)
         self.plot_human(i)
+        self.plot_robots(i)
         self.plot_ellipses(i)
         return (self.group_collection, self.human_collection, self.ellipse_collection)

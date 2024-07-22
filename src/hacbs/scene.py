@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 
-from pysocialforce.utils import stateutils
+from .utils import stateutils
 import matplotlib.pyplot as plt
 
 
@@ -122,6 +122,72 @@ class PedState:
                 return i
         return -1
 
+class RobotState:
+    def __init__(self,state,config):
+        self.robot_states=[]   
+        self.max_speed_multiplier = config("max_speed_multiplier",1.3)
+        self.step_width = config("robot_step_width",0.4)
+        self.max_speeds = None
+        self.initial_speeds =None
+        self.update(state)
+
+
+    def update(self, state):
+        self.state = state
+        
+    @staticmethod
+    def capped_velocity(desired_velocity, max_velocity):
+        """Scale down a desired velocity to its capped speed."""
+        desired_speeds = np.linalg.norm(desired_velocity, axis=-1)
+        factor = np.minimum(1.0, max_velocity / desired_speeds)
+        factor[desired_speeds == 0] = 0.0
+        return desired_velocity * np.expand_dims(factor, -1)
+
+    @property
+    def state(self):
+        return self._state 
+    @state.setter
+    def state(self,state):
+        self._state = state
+        self.robot_states.append(self._state.copy()) 
+
+    def get_states(self):
+        return np.stack(self.robot_states)
+    
+    def size(self)->int:
+        return self.state.shape[0]
+    
+    def pos(self) -> np.ndarray:
+        return self.state[:,0:2] #first two cols represent robot x,y
+    
+    def vel(self) -> np.ndarray: #next two cols represent robox v_x,v_y
+        return self.state[:,2:4]    
+    
+    def goal(self) ->np.ndarray: # 4 and 5 rerpesent goal location x_g, y_g
+        return self.state[:,4:6]
+    
+    def speeds(self):
+        return stateutils.speeds(self.state)
+    
+    def step(self,acc):
+        """ Move according to accelearation"""
+        desired_velocity = self.vel() + self.step_width *acc
+        desired_velocity = self.capped_velocity(desired_velocity,self.max_speeds)
+        #stop on reaching target
+        desired_velocity[stateutils.desired_directions(self.state)[1]<0.5] =[0,0]
+
+        #update state
+        next_state = self.state
+        #update position
+        next_state[:,0:2] +=desired_velocity*self.step_width
+        #update velocity
+        next_state[:,2:4] = desired_velocity
+        self.update(next_state)
+
+    def desired_directions(self):
+        return stateutils.desired_directions(self.state)[0]
+
+
 
 class EnvState:
     """State of the environment obstacles"""
@@ -151,22 +217,4 @@ class EnvState:
                 )
                 # print(line)
                 self._obstacles.append(line)
-    # def obstacles(self, obstacles):
-    #     """Input an np binary map"""
-    #     if obstacles is None:
-    #         self._obstacles = []
-    #     else:
-    #         self._obstacles = []
-    #         indeces = np.where(obstacles==1)
-    #         resoultion = 0.050 #m/pix
-    #         x_o = indeces[0]*resoultion
-    #         y_o = indeces[1]*resoultion
-    #         x_hat = np.mean(x_o)
-    #         y_hat = np.mean(y_o)
-    #         obstacle_coord =np.array([[x_i-x_hat,y_i-y_hat] for x_i,y_i in zip(x_o,y_o)])
-            
-    #         print(obstacle_coord)
-
-    #         plt.scatter(x_o-x_hat,y_o-y_hat,s=0.1)
-    #         plt.show()
-    #         self._obstacles.append([obstacle_coord.T])
+    

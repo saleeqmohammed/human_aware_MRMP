@@ -4,10 +4,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from pysocialforce.potentials import PedPedPotential, PedSpacePotential
-from pysocialforce.fieldofview import FieldOfView
-from pysocialforce.utils import Config, stateutils, logger
-
+from .potentials import PedPedPotential, PedSpacePotential
+from .fieldofview import FieldOfView
+from .utils import Config, stateutils, logger
 
 def camel_to_snake(camel_case_string):
     """Convert CamelCase to snake_case"""

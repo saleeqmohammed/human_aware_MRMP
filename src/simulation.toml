@@ -5,6 +5,8 @@ enable_group = true
 agent_radius = 0.35
 # the maximum speed doesn't exceed 1.3x initial speed
 max_speed_multiplier = 1.3
+robot_step_width = 0.4
+
 
 [desired_force]
 factor = 1.0
