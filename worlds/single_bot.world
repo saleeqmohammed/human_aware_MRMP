@@ -16,23 +16,23 @@ define topurg ranger
   )
   # generic model properties
   color "black"
-  size [ 0.05 0.05 0.1 ]
+  size [ 0.050 0.050 0.100 ]
 )
 
 define pioneer position
 (
-  size [0.45 0.45 0.25]
-  origin [-0.05 0 0 0]
+  size [0.450 0.450 0.250]
+  origin [-0.050 0.000 0.000 0.000]
   gui_nose 1
   drive "omni"
-  topurg(pose [ 0.135 0 0.202 0 ])
+  topurg(pose [ 0.135 0.000 0.202 0.000 ])
 )
 
 
 #Human model
 define human position
 (
-  size [0.5 0.5 0.5]
+  size [0.500 0.500 0.500]
   color "orange"
   gui_nose 1
   drive "omni"  # Setting drive type to omnidirectional for planar motion
@@ -53,7 +53,7 @@ define floorplan model
   gui_outline 0
   gripper_return 0
   fiducial_return 0
-  ranger_return 1
+  ranger_return 1.000
 )
 
 # set the resolution of the underlying raytrace model in meters
@@ -63,9 +63,9 @@ interval_sim 100  # simulation timestep in milliseconds
 
 window
 ( 
-  size [ 1000.000 600.000 ] 
-  rotate [ 0.000 0.000 ]
-  scale 16.0
+  size [ 1884 2123 ] 
+  rotate [ 55.500 4.000 ]
+  scale 55.236
 )
 
 # load an environment bitmap
@@ -73,17 +73,17 @@ floorplan
 ( 
   name "meeting"
   bitmap "meeting.pgm"
-  size [24.0 24.0 0.5]
-  pose [ 0 0 0 0 ]
+  size [24.000 24.000 0.500]
+  pose [ 0.000 0.000 0.000 0.000 ]
 )
 
 # Define multiple robots with different namespaces
-pioneer( pose [ 1 1 0 0 ] name "robot_0" color "blue")
-pioneer( pose [ 1 -1 0 0 ] name "robot_1" color "green")#robot_1
-pioneer( pose [ -1 1 0 0 ] name "robot_2" color "red")#robot_2
-pioneer( pose [ -1 -1 0 0 ] name "robot_3" color "yellow")
+pioneer( pose [ 1.000 1.000 0.000 0.000 ] name "robot_0" color "blue")
+pioneer( pose [ 1.000 -1.000 0.000 0.000 ] name "robot_1" color "green")#robot_1
+pioneer( pose [ -1.000 1.000 0.000 0.000 ] name "robot_2" color "red")#robot_2
+pioneer( pose [ -1.000 -1.000 0.000 0.000 ] name "robot_3" color "yellow")
 
 #Define humans in the worksapce
-human( pose [ 2 -6 0 0 ] name "Tom")#robot_4
-human( pose [ -5 4 0 0 ] name "Dick")#robot_5
-human( pose [ 6 1 0 0 ] name "Harry")#robot_6
+human( pose [ 2.000 -6.000 0.000 0.000 ] name "Tom")#robot_4
+human( pose [ -5.000 4.000 0.000 0.000 ] name "Dick")#robot_5
+human( pose [ 6.000 1.000 0.000 0.000 ] name "Harry")#robot_6

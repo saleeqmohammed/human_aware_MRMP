@@ -53,7 +53,18 @@ class Simulator:
         self.forces = self.make_forces(self.config)
 
         #setup CB-MPC
-        self.mpc = CBMPC(obstacles=obstacles,pos=self.robots.pos(),goal=self.robots.goal(),N=10)
+        self.mpc = CBMPC(obstacles=obstacles,N=10)
+        #(obstacles=obstacles,pos=self.robots.pos(),goal=self.robots.goal(),N=10)
+
+    
+    def calculate_acceleration (self):
+        current_problem = self.mpc.MPC_problem(
+            pos=self.robots.pos(),
+            goal=self.robots.goal(), 
+            )
+        
+        return self.mpc.control_inputs() 
+
 
     def make_forces(self, force_configs):
         """Construct forces"""
@@ -99,8 +110,6 @@ class Simulator:
         """step once"""
         self.peds.step(self.compute_forces())
 
-    def calculate_acceleration (self):
-        return self.mpc.control_inputs()                   
     def move_robot(self):
         """Move the robot one step"""
         self.robots.step(acc=self.calculate_acceleration())
@@ -109,5 +118,6 @@ class Simulator:
         """Step n time"""
         for _ in range(n):
             self.step_once() #pedestrian step update
-            self.move_robot() #robot step updatae
+            # self.move_robot() #robot step updatae
         return self
+    
