@@ -1,0 +1,12 @@
+<launch>
+
+  <include file="$(find warehouse_simulation)/launch/static_tf.launch"/>
+
+  <!-- Launch the move_base node -->
+  <node name="move_base" pkg="move_base" type="move_base" output="screen" ns="robot_0">
+    <rosparam file="$(find warehouse_simulation)/param/global_costmap_params.yaml" command="load" ns="global_costmap"/>
+    <rosparam file="$(find warehouse_simulation)/param/move_base_params.yaml" command="load"/>
+  </node>
+
+
+</launch>

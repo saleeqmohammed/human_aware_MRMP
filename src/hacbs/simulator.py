@@ -8,6 +8,9 @@ from .utils import DefaultConfig
 from .scene import PedState, EnvState,RobotState
 from . import forces
 from .planning import CBMPC
+import rospy
+import time
+from geometry_msgs.msg import Twist
 class Simulator:
     """Simulate model.
 
@@ -56,6 +59,14 @@ class Simulator:
         self.mpc = CBMPC(obstacles=obstacles,N=10)
         #(obstacles=obstacles,pos=self.robots.pos(),goal=self.robots.goal(),N=10)
 
+        #ROS publisher
+        ros_chars = ['/robot_'+str(i) for i in range(7)]
+        self.ros_robots =ros_chars[:4]
+        self.ros_humans =ros_chars[4:]
+        # rospy.init_node('move_peds')
+        # self.rate = rospy.Rate(10)
+        # self.human_vel_pub = [rospy.Publisher(human+'/cmd_vel',Twist,queue_size=10) for  human in self.ros_humans]
+        
     
     def calculate_acceleration (self):
         current_problem = self.mpc.MPC_problem(
@@ -109,15 +120,22 @@ class Simulator:
     def step_once(self):
         """step once"""
         self.peds.step(self.compute_forces())
+        # velocities = self.peds.vel()
+        # for i in range(len(velocities)):
+        #     twist = Twist()
+        #     twist.linear.x = velocities[i][0]
+        #     twist.linear.y = velocities[i][1]
+        #     self.human_vel_pub[i].publish(twist)
 
     def move_robot(self):
         """Move the robot one step"""
         self.robots.step(acc=self.calculate_acceleration())
-
+ 
     def step(self, n=1):
         """Step n time"""
         for _ in range(n):
             self.step_once() #pedestrian step update
             # self.move_robot() #robot step updatae
+            # self.rate.sleep()
         return self
     

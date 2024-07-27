@@ -6,9 +6,9 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
 
 def make_plan(start_pose, goal_pose):
-    rospy.wait_for_service('/move_base/make_plan')
+    rospy.wait_for_service('/robot_0/move_base/make_plan')
     try:
-        get_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
+        get_plan = rospy.ServiceProxy('/robot_0/move_base/make_plan', GetPlan)
         start = PoseStamped()
         start.header.frame_id = "map"
         start.pose = start_pose

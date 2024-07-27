@@ -19,9 +19,9 @@ if __name__ == "__main__":
     groups = [[1],[0], [2]]
     initial_robot_state = np.array(
         [
-            [1.0, 1.0,0.5,0.5,0,0], #robot 1
-            [1.0, -1.0,0.5,0.5,0,0],#robot 2
-            [-1.0, 1.0,0.5,0.5,0,0], #robot 3
+            [5.0, 5.0,0.5,0.5,0,0], #robot 1
+            [10, -5,0.5,0.5,0,0],#robot 2
+            [-10, 0.0,0.5,0.5,0,0], #robot 3
             [-1.0, -1.0,0.5,0.5,0,0] #robot 4
         ]
     )
@@ -41,6 +41,6 @@ if __name__ == "__main__":
     # update 80 steps
     s.step(80)
 
-    with psf.plot.SceneVisualizer(s, "../images/example") as sv:
+    with psf.plot.SceneVisualizer(s, "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/example") as sv:
         sv.animate()
         # sv.plot()

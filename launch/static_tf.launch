@@ -1,0 +1,7 @@
+<launch>
+  <!-- Static transform from map to odom -->
+  <node pkg="tf" type="static_transform_publisher" name="static_transform_publisher_map_to_odom" args="0 0 0 0 0 0 map odom 100" ns="robot_0" />
+  
+  <!-- Static transform from odom to base_link -->
+  <node pkg="tf" type="static_transform_publisher" name="static_transform_publisher_odom_to_base_link" args="0 0 0 0 0 0 odom base_link 100" ns="robot_0" />
+</launch>
