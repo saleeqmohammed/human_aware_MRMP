@@ -69,7 +69,7 @@ class GridEnvironment:
         heapq.heappush(open_set, (0, start_indices))
         came_from = {}
         g_score = {start_indices: 0}
-        f_score = {start_indices: self.heuristic(start_indices, goal_indices)}
+        f_score = {start_indices: self.heuristic(self.get_cell_center(*start_indices), goal)}
         
         while open_set:
             _, current = heapq.heappop(open_set)
@@ -78,33 +78,37 @@ class GridEnvironment:
                 return self.reconstruct_path(came_from, current)
             
             for neighbor in self.get_neighbors(current):
-                tentative_g_score = g_score[current] + self.grid_size
+                # Determine movement cost
+                if (current[0] != neighbor[0] and current[1] != neighbor[1]):
+                    # Diagonal movement
+                    tentative_g_score = g_score[current] + np.sqrt(2) * self.grid_size
+                else:
+                    # Horizontal or vertical movement
+                    tentative_g_score = g_score[current] + self.grid_size
                 
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
-                    f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal_indices)
+                    f_score[neighbor] = tentative_g_score + self.heuristic(self.get_cell_center(*neighbor), goal)
                     if neighbor not in [i[1] for i in open_set]:
                         heapq.heappush(open_set, (f_score[neighbor], neighbor))
         
         return None  # No path found
 
     def get_neighbors(self, indices):
-        """Get neighboring cells (up, down, left, right) of the current cell."""
+        """Get neighboring cells (up, down, left, right, and diagonals) of the current cell."""
         row, col = indices
         neighbors = []
         
-        if row > 0:  # Up
-            neighbors.append((row - 1, col))
-        if row < self.num_rows - 1:  # Down
-            neighbors.append((row + 1, col))
-        if col > 0:  # Left
-            neighbors.append((row, col - 1))
-        if col < self.num_cols - 1:  # Right
-            neighbors.append((row, col + 1))
+        # 8 possible moves: vertical, horizontal, and diagonal
+        for d_row, d_col in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            new_row = row + d_row
+            new_col = col + d_col
+            if 0 <= new_row < self.num_rows and 0 <= new_col < self.num_cols:
+                if not self.occupancy_grid[new_row, new_col]:
+                    neighbors.append((new_row, new_col))
         
-        # Filter out occupied cells
-        return [neighbor for neighbor in neighbors if not self.occupancy_grid[neighbor]]
+        return neighbors
 
     def reconstruct_path(self, came_from, current):
         """Reconstruct the path from start to goal."""
@@ -118,22 +122,6 @@ class GridEnvironment:
 
 
 
-
-class GlobalPlanner:
-    """
-    Djikstra planner to generate reference path
-    """
-    def __init__(self, obstacles):
-        self.map = None
-        self.step_resolution =10
-    def make_plan(self,pos,goal):
-        samples = int(np.linalg.norm((pos[0]-goal[0],pos[1]-goal[1])*self.step_resolution))
-        path = np.array(
-            list(
-                zip(np.linspace(pos[0],goal[0],samples),np.linspace(pos[1],goal[1],samples))
-            )
-        )
-        return path
     
 class Node:
     def __init__(self):
@@ -257,8 +245,8 @@ if __name__ == '__main__':
             grid_env.set_occupancy(p_o[0],p_o[1],True)
             
     # Find a path from start to goal
-    start = (0,0)
-    goal = (3,-3)
+    start = (-7,-5)
+    goal = (6,10)
     path = grid_env.a_star(start, goal)
     print("Path:", path)
     
