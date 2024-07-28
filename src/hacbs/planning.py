@@ -143,7 +143,12 @@ class CBMPC:
         self.obstacles = obstacles
         self.N = N
         self.Q = np.diag([12.0, 12.0])   
-        self.agents=[]      
+        self.agents=[]   
+
+        #constrint parameters
+        self.epsilon_g = 0.2 #goal tolerance
+        self.D = 1.04 #robot footprint
+        self.epsilon_r = 0.05 #robot robot collision tolerance   
     def MPC_problem(self,pos,goal) -> Tuple:
         """
         tuple M(Obstacle set, Initial robot positions, Final robot positions, Horizon length) : Problem definition
@@ -157,6 +162,13 @@ class CBMPC:
     def euclidian_distance(pos,goal):
         return np.sqrt(np.transpose(pos - goal)*(pos-goal))
     
+    def constraint_1(self):
+        """
+        Constraint to look for convergence at time instant k
+        Lim k->inf ||x_i^d - x_i^k|| <= epsilon_g
+        """
+
+        self.agents
     def MPC(self,M,a_i,C):
         """
         Model Predictive control subroutine
@@ -169,6 +181,7 @@ class CBMPC:
         J_i : cost of solution for agent i
         T_i = Trajectory of agent i
         """
+        X_i =np.zeros(self.N)
 
         pass
     def SIC(self,solution):
@@ -214,15 +227,13 @@ if __name__ == '__main__':
     obs = (obs -np.mean(obs))*map_endpoint_resolution+[1,1,2,2]
     obstacles = obs
     env = EnvState(obstacles,10)
+    min_x, max_x, min_y, max_y, grid_size = -12, 12, -12, 12, 1 # Example parameters
+    grid_env = GridEnvironment(min_x, max_x, min_y, max_y, grid_size)
 
     
 
-    mpc = CBMPC(obstacles=obstacles,N=10)
-    reference_path =GlobalPlanner(env.obstacles)
-    # reference_path.make_plan()
-    # mpc.MPC_problem()
-    min_x, max_x, min_y, max_y, grid_size = -12, 12, -12, 12, 1 # Example parameters
-    grid_env = GridEnvironment(min_x, max_x, min_y, max_y, grid_size)
+    
+
     
     # Set some cells as occupied
     # grid_env.set_occupancy(1.5, 2.5, True)
@@ -269,4 +280,10 @@ if __name__ == '__main__':
     ax.set_xlim(grid_env.min_x,grid_env.max_x)
     ax.set_ylim(grid_env.min_y,grid_env.max_y)
     # ax.grid()
+    mpc = CBMPC(obstacles=obstacles,N=10)
+    # mpc.MPC_problem()
     plt.show()
+
+
+    #TODO:reference path in horizon
+    

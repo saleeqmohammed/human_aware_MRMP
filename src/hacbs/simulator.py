@@ -7,10 +7,11 @@ See Helbing and Molnár 1998 and Moussaïd et al. 2010
 from .utils import DefaultConfig
 from .scene import PedState, EnvState,RobotState
 from . import forces
-from .planning import CBMPC
+from .planning import CBMPC,GridEnvironment
 import rospy
 import time
 from geometry_msgs.msg import Twist
+
 class Simulator:
     """Simulate model.
 
@@ -55,6 +56,13 @@ class Simulator:
         # construct forces
         self.forces = self.make_forces(self.config)
 
+        #descretization for planner
+        min_x, max_x, min_y, max_y, grid_size = -12, 12, -12, 12, 1 
+        self.grid_env = GridEnvironment(min_x,max_x,min_y,max_y,grid_size)
+        #set occuppancy for obstacles
+        for obstacle_poses in self.env.obstacles:
+            for p_o in obstacle_poses:
+                self.grid_env.set_occupancy(p_o[0],p_o[1],True)
         #setup CB-MPC
         self.mpc = CBMPC(obstacles=obstacles,N=10)
         #(obstacles=obstacles,pos=self.robots.pos(),goal=self.robots.goal(),N=10)
