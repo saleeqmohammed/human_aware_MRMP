@@ -258,8 +258,16 @@ class SceneVisualizer:
         else:
             self.robot_collection.set_facecolor(self.agent_colors)
         self.ax.add_collection(self.robot_collection)
+
+    def plot_reference_paths(self):
+        for path in self.scene.reference_paths:
+            if path:
+                path_x =[point[0] for point in path]
+                path_y = [point[1] for point in path]
+                self.ax.plot(path_x, path_y,linestyle='--')
     def animation_init(self):
         self.plot_obstacles()
+        self.plot_reference_paths()
         self.ax.add_collection(self.group_collection)
         self.ax.add_collection(self.human_collection)
         self.ax.add_collection(self.ellipse_collection)

@@ -2,14 +2,23 @@ import casadi as ca
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-
+from PIL import Image
+import time
 # Define parameters
 T = 0.2  # Time step
-N = 60   # Prediction horizon
+N = 60  # Prediction horizon
 
 # Define state and control dimensions
 nx = 3  # Number of states [x, y, theta]
 nu = 2  # Number of control inputs [v, omega]
+
+
+#Define robot and obstacle collisoin parameters
+D= 0.3 #robot footprint
+epsilon_g =0.2 #goal tolerance
+epsilon_r =0.05 #robot-robot collision tolerance
+kr=10e6 #inter robot collision slack coefficient
+ko =10e6 #obstacle collision slack coefficient
 
 # Define symbolic variables
 x = ca.SX.sym('x')
@@ -19,6 +28,8 @@ states = ca.vertcat(x, y, theta)
 v = ca.SX.sym('v')
 omega = ca.SX.sym('omega')
 controls = ca.vertcat(v, omega)
+delta_r = ca.SX.sym('delta_r')
+delta_o = ca.SX.sym('delta_o')
 
 # System dynamics
 rhs = ca.vertcat(v*ca.cos(theta), v*ca.sin(theta), omega)
@@ -41,8 +52,8 @@ goal_state = P[nx * (N+1):]  # Goal state
 
 # Define weights
 Q = np.diag([12.0, 12.0, 1.0])  # Weight for state tracking error
-R = np.diag([12.0, 12.0])       # Weight for control effort
-P_term = np.diag([10.0,10,10.0])  # Weight for goal tracking error
+R = np.diag([12.0, 0.05])       # Weight for control effort
+P_term = np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
 
 # Initial state constraint
 st = X[:, 0]
@@ -53,7 +64,7 @@ for k in range(N):
     st = X[:, k]
     con = U[:, k]
     # Cost function: weighted state deviation from trajectory + weighted control effort + terminal cost
-    obj += ca.mtimes([(st - ref_trajectory[:, k]).T, Q, (st - ref_trajectory[:, k])]) + ca.mtimes([con.T, R, con]) #+ ca.mtimes([X[:,N].T,P_term,X[:N]]) TODO: fix matrix dimensions
+    obj += ca.mtimes([(st - ref_trajectory[:, k]).T, Q, (st - ref_trajectory[:, k])]) + ca.mtimes([con.T, R, con]) + ca.mtimes([(X[:,N]-goal_state).T,P_term,(X[:,N]-goal_state)]) 
     st_next = X[:, k+1]
     f_value = f(st, con)
     st_next_euler = st + T*f_value
@@ -62,6 +73,7 @@ for k in range(N):
 # Add goal tracking penalty to the objective function
 # final_state = X[:, N]
 # obj += ca.mtimes([(final_state - goal_state).T, P_goal, (final_state - goal_state)])
+
 
 # Define optimization variables
 OPT_variables = ca.vertcat(ca.reshape(X, nx*(N+1), 1), ca.reshape(U, nu*N, 1))
@@ -108,6 +120,7 @@ ubx = ca.vertcat(*ubx)
 lbg = ca.vertcat(*([0] * nx * (N + 1)))
 ubg = lbg
 
+start_time = time.monotonic()
 # Initial state and trajectory reference states
 x0 = np.array([0.0, 0.0, 0.0])
 # Define a trajectory as an example
@@ -128,6 +141,8 @@ sol_x = sol['x'].full().flatten()
 x_solution = sol_x[:nx*(N+1)].reshape((N+1, nx))
 u_solution = sol_x[nx*(N+1):].reshape((N, nu))
 
+end_time = time.monotonic()
+print(f"execution time:{end_time-start_time} s")
 print("Optimal states trajectory: \n", x_solution)
 print("Optimal control inputs: \n", u_solution)
 
@@ -149,6 +164,7 @@ def animate(i):
 
 # Plot setup
 fig = plt.figure()
-ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=False)
+ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
 
+ani.save('animation.gif',writer='pillow',fps=5)
 plt.show()

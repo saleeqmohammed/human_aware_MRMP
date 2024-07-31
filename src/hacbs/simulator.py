@@ -63,17 +63,20 @@ class Simulator:
         for obstacle_poses in self.env.obstacles:
             for p_o in obstacle_poses:
                 self.grid_env.set_occupancy(p_o[0],p_o[1],True)
+    
+
+        #generate reference paths
+        self.reference_paths =[]
+        for robot in robot_state:
+            start = (robot[0],robot[1])
+            goal = (robot[4],robot[5])
+            path = self.grid_env.a_star(start,goal)
+            self.reference_paths.append(path)
         #setup CB-MPC
         self.mpc = CBMPC(obstacles=obstacles,N=10)
-        #(obstacles=obstacles,pos=self.robots.pos(),goal=self.robots.goal(),N=10)
+    
 
-        #ROS publisher
-        ros_chars = ['/robot_'+str(i) for i in range(7)]
-        self.ros_robots =ros_chars[:4]
-        self.ros_humans =ros_chars[4:]
-        # rospy.init_node('move_peds')
-        # self.rate = rospy.Rate(10)
-        # self.human_vel_pub = [rospy.Publisher(human+'/cmd_vel',Twist,queue_size=10) for  human in self.ros_humans]
+
         
     
     def calculate_acceleration (self):
@@ -137,13 +140,13 @@ class Simulator:
 
     def move_robot(self):
         """Move the robot one step"""
-        self.robots.step(acc=self.calculate_acceleration())
+        # self.robots.step(acc=self.calculate_acceleration())
+        #Generete reference paths for robots
+
  
     def step(self, n=1):
         """Step n time"""
         for _ in range(n):
             self.step_once() #pedestrian step update
-            # self.move_robot() #robot step updatae
-            # self.rate.sleep()
         return self
     
