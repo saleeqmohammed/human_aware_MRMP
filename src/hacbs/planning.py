@@ -123,64 +123,244 @@ class GridEnvironment:
 
     
 class Node:
-    def __init__(self):
+    def __init__(self,epsilon_r,epsilon_o,D):
         self.cost = None
-        self.solution = None
+        self.solution = {}
         self.constraints=None
-    def conflicts(self):
-        return 0
+        self.obstacles={}
+        self.epsilon_r = epsilon_r
+        self.epsilon_o = epsilon_o
+        self.D = D
+    def check_robot_collision(self,trajectory_i,trajectory_j,delta_r):
+        """
+        Constriant 3:
+        inter robot collision
+        ||P_j^k - P_i^k|| >= D + delta_r + epsilon_r
+        """
+        bool_filter =np.linalg.norm(trajectory_i-trajectory_j,axis=1) >= self.D + delta_r + self.epsilon_r
+        r_collision_tidx = np.where(bool_filter==False)[0]
+        return r_collision_tidx
+    def check_obstacle_collision(self,obstacles,trajectory,delta_o):
+        """
+        Check collison between obstacles and agent
+        Input: obstacles,trajectory,delta_o,epsilon_o
 
-class O_list:
-    def __init__(self):
-        self.lowest =Node
-    def get_lowest(self):
-        return self.lowest
-    def insert(R:Node):
-        pass
+        Constraint 4
+        ||P_p^o - P_i^k|| >= D/2+ delta_o + epsilon_o
+
+        output: status, o_collision_index
+        """
+        o_collision_tidx =[]
+        o_idx=[]
+        if len(obstacles):
+            difference_matrix =  trajectory[:,np.newaxis,:2] - obstacles[np.newaxis,:,:]
+            distance_matrix = np.linalg.norm(difference_matrix,axis=2)
+            bool_filter = distance_matrix >= self.D/2 + delta_o + self.epsilon_o
+            o_collision_tidx,o_idx = np.where(bool_filter==False)
+        
+        return o_collision_tidx, o_idx
+    def conflicts(self):
+        """  
+        Return the list of conflicts in given solution node
+        Check collisions with respect to constraints 3,4 in Tajbaksh et al.
+        """
+        conflicts =[]
+        N_a = len(self.solution.keys())
+        for a_i in range(N_a):
+            #check obstacle collision for each agent
+            x_solution_i,_,delta_r_i,delta_o_i = self.solution[a_i]
+            o_collision_tidx,o_collision_oidx =self.check_obstacle_collision(self.obstacles[a_i],x_solution_i,delta_o_i)
+            #if there is collision add conflict
+            if len(o_collision_tidx):
+                t_c = o_collision_tidx[0]
+                t_h = len(x_solution_i)
+                conflicts.append((a_i,-1,[t_c,t_h]))
+            #check collision with every other robot
+            for a_j in range(a_i+1,N_a):
+                x_solution_j,_,delta_r_j,delta_o_j = self.solution[a_j]
+                delta_r = max(delta_r_i,delta_r_j)
+                r_collision_tidx =self.check_robot_collision(x_solution_i,x_solution_j,delta_r)
+                #if there is collision add conflict
+                if len(r_collision_tidx):
+                    t_c = r_collision_tidx[0]
+                    t_h = len(x_solution_i)
+                    conflicts.append((a_i,a_j,[t_c,t_h]))
+        return conflicts
+
+
+
 class CBMPC:
-    def __init__(self,obstacles,N):
+    def __init__(self,obstacles,reference_paths,N):
         self.obstacles = obstacles
         self.N = N 
-        self.agents=[]   
-
+        self.agents =0
+        self.reference_paths=reference_paths
         # Define weights
-        self.Q = np.diag([12.0, 12.0, 1.0])  # Weight for state tracking error
+        self.Q = 2*np.diag([12.0, 12.0, 1.0])  # Weight for state tracking error
         self.R = np.diag([12.0, 0.05])       # Weight for control effort
-        self.P_term = np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
+        self.P_term = 2*np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
         #constrint parameters
         self.epsilon_g = 0.2 #goal tolerance
         self.D = 1.04 #robot footprint
         self.epsilon_r = 0.05 #robot robot collision tolerance   
         self.kr = 10e6 #inter robot collision tolerance slcak coefficient
         self.ko = 10e6 #obstacle collision tolerance slack coefficient
+        self.epsilon_o = 0.05#robot-obstacle collision tolerance
         #mpc parameters
         self.T = 0.2 #mpc time step
         self.nx = 3 #number of states [x,y,theta]
         self.nu = 2 #number of controls [v, omega]
 
-        #
+        #create open list for solution
+        self.o_list = []
 
-    def MPC_problem(self,pos,goal) -> Tuple:
-        """
-        tuple M(Obstacle set, Initial robot positions, Final robot positions, Horizon length) : Problem definition
-        """
-        M = (self.obstacles,pos,goal,self.N)
-        return M
+
     @staticmethod
     def trajectory_length(solution):
-        X_i = solution.poses
-    @staticmethod
-    def euclidian_distance(pos,goal):
-        return np.sqrt(np.transpose(pos - goal)*(pos-goal))
-    
-    def constraint_1(self):
-        """
-        Constraint to look for convergence at time instant k
-        Lim k->inf ||x_i^d - x_i^k|| <= epsilon_g
-        """
+        # Initialize the total length to zero
+        total_length = 0.0
 
-        self.agents
-    def MPC(self,M,a_i,C):
+        # Iterate over the points in the trajectory
+        for i in range(1, len(solution)):
+            # Get the previous and current point
+            prev_point = solution[i - 1]
+            current_point = solution[i]
+
+            # Calculate the Euclidean distance between the points
+            distance = np.linalg.norm(current_point - prev_point)
+
+            # Add the distance to the total length
+            total_length += distance
+
+        return total_length
+    @staticmethod
+    def precompute_cumulative_distances(path):
+        """Precompute cumulative distances along the path."""
+        cumulative_distances = [0]  # Start at 0 for the first point
+        for i in range(1, len(path)):
+            dist = np.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1])
+            cumulative_distances.append(cumulative_distances[-1] + dist)
+        return cumulative_distances
+    @staticmethod
+    def find_closest_point(precomputed_distances, path, coordinate):
+        """Find the closest point in the path to the given coordinate."""
+        print(f"coordinate: {coordinate}")
+        min_distance = float('inf')
+        closest_index = 0
+        for i, (x, y) in enumerate(path):
+            distance = np.hypot(x - coordinate[0], y - coordinate[1])
+            print()
+            if distance < min_distance:
+                min_distance = distance
+                closest_index = i
+        return closest_index
+    @staticmethod
+    def find_point_at_distance(precomputed_distances, start_index, distance):
+        """Find the point in the path at a specific distance from the start_index."""
+        target_distance = precomputed_distances[start_index] + distance
+        for i in range(start_index, len(precomputed_distances)):
+            if precomputed_distances[i] >= target_distance:
+                return i
+        return len(precomputed_distances) - 1  # Return the last point if the distance exceeds the path length
+    @staticmethod
+    def calculate_angle(p1, p2):
+        """Calculate the angle (theta) between two points p1 and p2."""
+        delta_x = p2[0] - p1[0]
+        delta_y = p2[1] - p1[1]
+        return np.arctan2(delta_y, delta_x)
+    def get_obstacles_in_range(self,pos,obstacles)->np.ndarray:
+        """
+        Get obstacles in range of horizon
+        Input: position of robot, all obstacles in the environment
+        Output: list of obstacles in range
+        """
+        obstacles_inrange=[]
+        for obstacle in obstacles:
+            obstacle_dists = np.linalg.norm(obstacle-pos[:2],axis=1)
+            min_dist_idx =np.argmin(obstacle_dists)
+            if obstacle_dists[min_dist_idx] < 5:
+                # print(f"Added obstacle point {obstacle[min_dist_idx]} at distance: {obstacle_dists[min_dist_idx]}")
+                #we will take only the closest point in the obstacle to plan for collision
+                obstacles_inrange.append(obstacle[min_dist_idx])
+        return np.array(obstacles_inrange)
+    def generate_reference(self,path, coordinate, distance, N, precomputed_distances=None):
+        """
+        Generate a linspace of size N for a section of the path, including x, y, and theta.
+        - x, y: Coordinates of the points.
+        - theta: Angle between consecutive points.
+
+        Parameters:
+        - path: List of tuples, where each tuple is an (x, y) pair.
+        - coordinate: Tuple (x, y), the reference coordinate to find the closest point in the path.
+        - distance: The distance from the closest point to find the end point in the path.
+        - N: Number of points in the resulting linspace, including the endpoints.
+        - precomputed_distances: Optional list of precomputed cumulative distances along the path.
+
+        Returns:
+        - trajectory: Array of shape (N, 3), each row representing (x, y, theta).
+        """
+      
+        if precomputed_distances is None:
+            precomputed_distances = self.precompute_cumulative_distances(path)
+        
+        # Find the closest point to the given coordinate
+        start_index = self.find_closest_point(precomputed_distances, path, coordinate)
+        
+        # Find the point at the given distance from the closest point
+        end_index = self.find_point_at_distance(precomputed_distances, start_index, distance)
+
+        if start_index == end_index:
+            start_index = end_index - 1
+        # Extract the relevant section of the path
+        section = path[start_index:end_index + 1]
+        section_distances = precomputed_distances[start_index:end_index + 1]
+
+        # Normalize distances to [0, 1] for interpolation
+        normalized_distances = (np.array(section_distances) - section_distances[0]) / (section_distances[-1] - section_distances[0])
+
+        # Generate linspace of size N over the range [0, 1]
+        linspace = np.linspace(0, 1, N)
+
+        # Separate x and y coordinates
+        x_coords = [point[0] for point in section]
+        y_coords = [point[1] for point in section]
+
+        # Interpolate x and y coordinates along the linspace
+        linspace_x = np.interp(linspace, normalized_distances, x_coords)
+        linspace_y = np.interp(linspace, normalized_distances, y_coords)
+
+        # Calculate theta (angle) for each segment
+        thetas = []
+        for i in range(len(section) - 1):
+            theta = self.calculate_angle(section[i], section[i + 1])
+            thetas.append(theta)
+        thetas.append(thetas[-1])  # Repeat the last angle for consistency with points
+
+        # Interpolate theta along the linspace
+        linspace_theta = np.interp(linspace, normalized_distances, thetas)
+
+        # Combine interpolated x, y coordinates, and theta into (x, y, theta) format
+        trajectory = np.column_stack((linspace_x, linspace_y, linspace_theta))
+
+        return trajectory
+
+    #method to add a node in olist
+    def insert_node(self,R:Node):
+        """
+        Inserts node R into list o_list maintaining ascending order based on R.cost.
+        """
+        # Perform binary search manually to find the correct insertion point
+        lo, hi = 0, len(self.o_list)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if self.o_list[mid].cost < R.cost:
+                lo = mid + 1
+            else:
+                hi = mid
+        self.o_list.insert(lo, R)
+    
+
+    def MPC(self,M,a_i,C)->list:
         """
         Model Predictive control subroutine
         MPC(M,a_i,C)
@@ -230,21 +410,111 @@ class CBMPC:
         ref_trajectory = P[:nx * (N+1)].reshape((nx, N+1))  # Reference trajectory over N+1 steps
         goal_state = P[nx * (N+1):]  # Goal state of the robot in global reference
 
-        # Initial state constraint
+
+        '''
+        
+        GENERAL CONSTRAINTS
+
+        '''
+
+        # Initial state constraint 
+        """
+        Constraint 6 Tajbakhsh et al.
+
+        """
         st = X[:, 0]
-        g.append(st - ref_trajectory[:, 0])
+        g.append(st - ref_trajectory[:, 0]) 
         # Formulate the optimization problem with weights
         for k in range(N):
             st = X[:, k]
             con = U[:, k]
             # Cost function: weighted state deviation from trajectory + weighted control effort + terminal cost
-            obj += ca.mtimes([(st - ref_trajectory[:, k]).T, Q, (st - ref_trajectory[:, k])]) + ca.mtimes([con.T, R, con]) + ca.mtimes([(X[:,N]-goal_state).T,P_term,(X[:,N]-goal_state)]) #+ kr*delta_r + ko*delta_o
+            obj += ca.mtimes([(st - ref_trajectory[:, k]).T, Q, (st - ref_trajectory[:, k])]) + ca.mtimes([con.T, R, con]) + ca.mtimes([(X[:,N]-goal_state).T,P_term,(X[:,N]-goal_state)]) + kr*delta_r + ko*delta_o
             st_next = X[:, k+1]
             f_value = f(st, con)
             st_next_euler = st + T*f_value
+            #constraint 1 in tajbaksh et al.
             g.append(st_next - st_next_euler)
+
+            
+
+        '''
+                BOUNDS
+        '''
+
+        # Define the bounds
+        lbx = []
+        ubx = []
+
+        # State bounds
+        for _ in range(N+1):
+            lbx.extend([-ca.inf, -ca.inf, -ca.inf])
+            ubx.extend([ca.inf, ca.inf, ca.inf])
+
+        # Control bounds
+        for _ in range(N):
+            lbx.extend([-1.0, -np.pi/4])  # v lower bound, omega lower bound
+            ubx.extend([1.0, np.pi/4])   # v upper bound, omega upper bound
+
+
+        #obstacle constraint bounds (non-neg delta const. 8 in Tajbaksh et al.)
+        lbx.extend([0.0])  # Lower bound for delta_r
+        ubx.extend([ca.inf])   # Upper bound for delta_r
+        lbx.extend([0.0])  # Lower bound for delta_o
+        ubx.extend([ca.inf])   # Upper bound for delta_o
+
+        lbx = ca.vertcat(*lbx)
+        ubx = ca.vertcat(*ubx)
+
+        # Constraint bounds (equality constraints)
+        lbg = [0] * nx * (N + 1)
+        ubg = lbg
+
+
+        '''
+            ADDITIONAL COLLISION CONSTRAINTS AND BOUNDS
+        '''
+        #check if there are additional constraints
+        if len(C) or False:
+            if C[0]:
+            #obstacle constraint
+                t_c,t_h =C[2]
+                obs = C[1]
+                N_o =len(obs)
+                #for each time step till conflict,
+                for l in range(t_c,N):
+                    #for each obstacle in obstacles:
+                    #Define obstacle positions in symbolics
+                    O_sym = ca.SX.sym('O_sym',obs.size) 
+                    O_pos = O_sym.reshape((2,N_o))
+                    for o_idx in range(N_o):
+                        #constrain x, y of state alone
+                        st_pos = X[:2,l]
+                        p_o = O_pos[:,o_idx]
+                        distance_squared = ca.sumsqr(p_o - st_pos)
+                        rhs_lim = (self.D/2 * delta_o + self.epsilon_o)**2
+                        """
+                        (D/2 +delta_o + epsilon_o)**2 -||p_o - st||**2 <=0
+                        """
+                        #add constraint
+                        g.append(rhs_lim-distance_squared)
+                        # add bounds
+                        lbg.append(-ca.inf)
+                        ubg.append(0)
+                #add obstacle symbolics to parameters
+                P = ca.vertcat(P,O_sym)
+            #robot constraint
+
+        #finalise bounds
+        lbg = ca.vertcat(*lbg)
+        ubg = ca.vertcat(*ubg)
+
+        '''
+            SOLVER CONFIGURATION
+        '''
+
         # Define optimization variables
-        OPT_variables = ca.vertcat(ca.reshape(X, nx*(N+1), 1), ca.reshape(U, nu*N, 1))
+        OPT_variables = ca.vertcat(ca.reshape(X, nx*(N+1), 1), ca.reshape(U, nu*N, 1),delta_r,delta_o)
         # Define NLP problem
         nlp_prob = {
             'f': obj,
@@ -265,106 +535,175 @@ class CBMPC:
         # Create solver
         solver = ca.nlpsol('solver', 'ipopt', nlp_prob, opts)
 
-        # Define the bounds
-        lbx = []
-        ubx = []
-
-        # State bounds
-        for _ in range(N+1):
-            lbx.extend([-ca.inf, -ca.inf, -ca.inf])
-            ubx.extend([ca.inf, ca.inf, ca.inf])
-
-        # Control bounds
-        for _ in range(N):
-            lbx.extend([-1.0, -np.pi/4])  # v lower bound, omega lower bound
-            ubx.extend([1.0, np.pi/4])   # v upper bound, omega upper bound
-
-        lbx = ca.vertcat(*lbx)
-        ubx = ca.vertcat(*ubx)
-
-        # Constraint bounds (equality constraints)
-        lbg = ca.vertcat(*([0] * nx * (N + 1)))
-        ubg = lbg
         # Initial state and trajectory reference states
-        x0 = np.array([0.0, 0.0, 0.0])
-        # Define a trajectory as an example
-        # For example, a linear trajectory from (0,0) to (5,5)
-        trajectory = np.linspace([0.0, 0.0, 0.0], [5.0, 5.0, 0.0], N+1)
-        goal = np.array([5.0, 5.0, 0.0])
+        robot_state = np.squeeze(M[1])
+        pos = robot_state[a_i]
+    
+        
+        trajectory = self.generate_reference(self.reference_paths[a_i],pos,5,self.N+1)
+        
+        goal = trajectory[-1]
         # Flatten the trajectory into a single vector
         p = np.concatenate((trajectory.flatten(), goal))
 
         # Initial guess
-        x_init = np.zeros((nx*(N+1) + nu*N, 1))
-
+        x_init = np.zeros((nx*(N+1) + nu*N+2, 1))
         # Solve the problem
         sol = solver(x0=x_init, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=p)
 
+
         # Extract solution
         sol_x = sol['x'].full().flatten()
-        x_solution = sol_x[:nx*(N+1)].reshape((N+1, nx))
-        u_solution = sol_x[nx*(N+1):].reshape((N, nu))
+        x_solution = sol_x[:nx * (N + 1)].reshape((N + 1, nx))
+        u_solution = sol_x[nx * (N + 1):-2].reshape((N, nu))
+        delta_r_solution = sol_x[-2]  # Extract delta_r
+        delta_o_solution = sol_x[-1]  # Extract delta_o
 
-        print("Optimal states trajectory: \n", x_solution)
-        print("Optimal control inputs: \n", u_solution)
-
-        # Convert ref_trajectory to numerical format
-        ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
-
-        # Plotting and animation
-        def animate(i):
-            plt.clf()
-            plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
-            plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
-            plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
-            plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
-            plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
-            plt.xlabel('x')
-            plt.ylabel('y')
-            plt.title('Agent Path and Reference Trajectory')
-            plt.legend()
+    
 
         # Plot setup
-        fig = plt.figure()
-        ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
+        # Convert ref_trajectory to numerical format
+        # ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
 
-        ani.save('animation.gif',writer='pillow',fps=5)
-        plt.show()
+        # # # Plotting and animation
+        # def animate(i):
+        #     plt.clf()
+        #     plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
+        #     plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
+        #     plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
+        #     plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
+        #     plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
+        #     plt.xlabel('x')
+        #     plt.ylabel('y')
+        #     plt.title('Agent Path and Reference Trajectory')
+        #     plt.legend()
+
+        # fig = plt.figure()
+        # ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
+
+        # ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
+        # plt.show()
 
 
-    def SIC(self,solution):
+        return [x_solution,u_solution,delta_r_solution,delta_o_solution]
+
+    def SIC(self,solution,goals):
         """
         Method to calculate sum of induvidual costs
         J_n = J_c + J_f
 
         Input: set of x_i in solution
         """
-        #trajectory length till now
-        J_c = self.trajectory_length(solution)
-        #distance left
-        J_f = self.euclidaian_distance()
-        pass
-    def Solution(self,M):
-        R = Node()
-        for a_i in self.agents:
-            R.solution[a_i] = self.MPC(M,a_i,{})
-        R.cost =self.SIC(R.solution)
-        O= O_list()
-        O.insert(R)
+        J = 0
+        for n in range(self.agents):
+
+            sol_n= solution[n]
+            solution_trajectory =sol_n[1]
+            # print(f"solution trajectory {solution_trajectory}")
+            #trajectory length till now
+            J_c = self.trajectory_length(solution_trajectory)
+            #distance left
+            goal = goals[n]
+            endpoint = solution_trajectory[-1]
+            J_f = np.linalg.norm(goal - endpoint)
+            J_n = J_c + J_f
+            J += J_n
+        return J
+    def conflict_solve(self,M):
+        """
+        Input: M(N_o,X_i,X_f,N)
+        Output: Conllision Free trajectories P.solution
+        """
+        self.agents = len(np.squeeze(M[1]))
+        goals = np.squeeze(M[2]) #X_f
+        print(f"number of agents:{self.agents}")
+        R = Node(self.epsilon_r,self.epsilon_o,self.D)
+        for a_i in range(self.agents):
+            print(f"Solving for agent: {a_i}")
+            #Find the obstacles in planned MPC horizon
+            #get the agent location from M
+            robot_state = np.squeeze(M[1])
+            pos = robot_state[a_i]
+            #get obstacles set from M
+            obs_h = self.get_obstacles_in_range(pos,M[0])
+            R.obstacles[a_i] =obs_h
+            #solve the MPC problem
+            R.solution[a_i] = self.MPC(M,a_i,())
+        R.cost =self.SIC(R.solution,goals) #calculate SIC for solution trajectory
+        print(f"R.cost: {R.cost}")
+
+        self.insert_node(R)
+
         while(True):
-            P = O.get_lowest()
+            P = self.o_list.pop(0)
             if len(P.conflicts()) ==0:
                 return P.solution
-            C = P.conflicts()[1]
-            for a_i in C.agents:
-                A = Node()
-                A.constraints = P.constraints + ()
+            C = P.conflicts()[0] #first conflict
+            a_i,a_j = C[0],C[1]
+
+            #deal with obstacle collision
+            if a_j == -1:
+                A = Node(self.epsilon_r,self.epsilon_o,self.D)
+
+                #start with precalculated solutions
+                A.solution = P.solution
+                #add the new constraints
+                #constraint format (constraint_type=1( 1: obstacle, 0: robot),obstacles,[tc,th])
+                A.constraints = (1,P.obstacles[a_i],C[2])
                 A.solution[a_i] = self.MPC(M,a_i,A.constraints)
                 A.cost = self.SIC(A.solution)
-                O.insert(A)
+                self.insert_node(A)
+            else:
+                #deal with robot-robot collision
+                C_agents = [a_i,a_j]
+                for a_i in C_agents:
+                    A = Node(self.epsilon_r,self.epsilon_o,self.D)
+                    A.constraints = P.constraints + ()
+                    A.solution[a_i] = self.MPC(M,a_i,A.constraints)
+                    A.cost = self.SIC(A.solution)
+                    self.insert_node(A)
 
-
-
+    @staticmethod
+    def get_velocities(solution: dict) -> np.ndarray:
+        """
+        Extracts the first velocity components (vx, vy) from the control inputs
+        provided in the solution dictionary.
+        
+        Parameters:
+        - solution: A dictionary where keys are agent indices and values are tuples containing 
+                    (state_trajectory, control_inputs). Control inputs are in the form [v, omega].
+        
+        Returns:
+        - A NumPy array where each row contains [vx, vy] for each agent at the first time step.
+        """
+        velocities = []
+        
+        for a_i in solution.keys():
+            # Extract state trajectory and control inputs for the agent
+            _, u_solution,_,_ = solution[a_i]
+            
+            # Only use the first control input
+            if len(u_solution) > 0:
+                # Extract the first control input
+                v = u_solution[0, 0]  # Linear velocity
+                omega = u_solution[0, 1]  # Angular velocity (not used directly here)
+                
+                # Extract the initial orientation theta from the state trajectory
+                # Assuming the state trajectory is available and has at least one state
+                if len(solution[a_i][0]) > 0:
+                    theta = solution[a_i][0][0, 2]  # Orientation (angle) in radians
+                    
+                    # Compute vx and vy using theta
+                    vx = v * np.cos(theta)
+                    vy = v * np.sin(theta)
+                    
+                    # Append the computed velocities for this agent
+                    velocities.append([vx, vy])
+        
+        # Convert list of arrays into a single NumPy array
+        velocity_vectors = np.array(velocities)
+        
+        return velocity_vectors
 if __name__ == '__main__':
     #obstacles: represeted by x,y positions
     obstacles = [
@@ -390,12 +729,12 @@ if __name__ == '__main__':
     # grid_env.set_occupancy(-3.5, -4.5, True)
     
     # Check occupancy
-    print(grid_env.is_occupied(1.5, 2.5))  # True
-    print(grid_env.is_occupied(5, 5))      # False
+    # print(grid_env.is_occupied(1.5, 2.5))  # True
+    # print(grid_env.is_occupied(5, 5))      # False
     
-    # Get cell center
-    print(grid_env.get_cell_center(1, 2))  # Should be within the min_x, max_x, min_y, max_y range
-    print(grid_env.get_cell_center(3, 4))  # Should be within the min_x, max_x, min_y, max_y range
+    # # Get cell center
+    # print(grid_env.get_cell_center(1, 2))  # Should be within the min_x, max_x, min_y, max_y range
+    # print(grid_env.get_cell_center(3, 4))  # Should be within the min_x, max_x, min_y, max_y range
     
     # Print the occupancy grid
     # grid_env.print_grid()
@@ -409,7 +748,7 @@ if __name__ == '__main__':
     start = (-7,-5)
     goal = (6,10)
     path = grid_env.a_star(start, goal)
-    print("Path:", path)
+    # print("Path:", path)
     
     
     #plot occuppancy
@@ -423,7 +762,7 @@ if __name__ == '__main__':
     #plot path
     # Optionally overlay the path
     if path:
-        print(path)
+        # print(path)
         path_x = [point[0] for point in path]
         path_y = [point[1] for point in path]
         ax.scatter(path_x, path_y, c='blue', marker='o', label='Path')
@@ -431,8 +770,10 @@ if __name__ == '__main__':
     ax.set_xlim(grid_env.min_x,grid_env.max_x)
     ax.set_ylim(grid_env.min_y,grid_env.max_y)
     # ax.grid()
-    cbmpc = CBMPC(obstacles=obstacles,N=10)
-    # mpc.MPC_problem()
+    print(f"reference path vector {[path]}")
+    cbmpc = CBMPC(obstacles=obstacles,reference_paths=[path],N=10)
+
+    
     cbmpc.MPC(M=None,a_i=None,C=None)
     plt.show()
 

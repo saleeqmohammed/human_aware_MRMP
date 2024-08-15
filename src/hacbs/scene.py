@@ -12,7 +12,7 @@ class PedState:
 
     def __init__(self, state, groups, config):
         self.default_tau = config("tau", 0.5)
-        self.step_width = config("step_width", 0.4)
+        self.step_width = config("step_width", 0.2)
         self.agent_radius = config("agent_radius", 0.35)
         self.max_speed_multiplier = config("max_speed_multiplier", 1.3)
 
@@ -126,7 +126,7 @@ class RobotState:
     def __init__(self,state,config):
         self.robot_states=[]   
         self.max_speed_multiplier = config("max_speed_multiplier",1.3)
-        self.step_width = config("robot_step_width",0.4)
+        self.step_width = config("robot_step_width",0.6)
         self.max_speeds = None
         self.initial_speeds =None
         self.update(state)
@@ -169,13 +169,14 @@ class RobotState:
     def speeds(self):
         return stateutils.speeds(self.state)
     
-    def step(self,acc):
+    def step(self,vel):
         """ Move according to accelearation"""
-        desired_velocity = self.vel() + self.step_width *acc
-        desired_velocity = self.capped_velocity(desired_velocity,self.max_speeds)
+        desired_velocity = vel
+        # desired_velocity = self.capped_velocity(desired_velocity,self.max_speeds)
         #stop on reaching target
-        desired_velocity[stateutils.desired_directions(self.state)[1]<0.5] =[0,0]
-
+        epsilon_g = 1
+        velocity_mask = np.linalg.norm(self.state[:,0:2]- self.state[:,4:6])<=epsilon_g
+        desired_velocity[velocity_mask] =0
         #update state
         next_state = self.state
         #update position

@@ -241,8 +241,7 @@ class SceneVisualizer:
     def plot_robots(self,step=-1):
         """Generate patches for robots"""
         _,_,states = self.scene.get_states()
-        # current_state = states[step]
-        current_state = states[0]
+        current_state = states[step]
         radius = [0.52]*current_state.shape[0]
         if self.robot_actors:
             for i, robot in enumerate(self.robot_actors):
@@ -262,9 +261,9 @@ class SceneVisualizer:
     def plot_reference_paths(self):
         for path in self.scene.reference_paths:
             if path:
-                path_x =[point[0] for point in path]
-                path_y = [point[1] for point in path]
-                self.ax.plot(path_x, path_y,linestyle='--')
+                path_x =[point[0]-0.5 for point in path]
+                path_y = [point[1]-0.5 for point in path]
+                self.ax.plot(path_x, path_y,linestyle='--',alpha=0.5)
     def animation_init(self):
         self.plot_obstacles()
         self.plot_reference_paths()

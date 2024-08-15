@@ -11,8 +11,10 @@ from .planning import CBMPC,GridEnvironment
 import rospy
 import time
 from geometry_msgs.msg import Twist
-
+from .utils.logging import logger
+import numpy as np
 class Simulator:
+
     """Simulate model.
 
     ...
@@ -73,20 +75,34 @@ class Simulator:
             path = self.grid_env.a_star(start,goal)
             self.reference_paths.append(path)
         #setup CB-MPC
-        self.mpc = CBMPC(obstacles=obstacles,N=10)
-    
+        self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=10)
 
 
         
     
-    def calculate_acceleration (self):
-        current_problem = self.mpc.MPC_problem(
-            pos=self.robots.pos(),
-            goal=self.robots.goal(), 
-            )
+    def calculte_u (self):
+        """
+        tuple M(Obstacle set, Initial robot positions, Final robot positions, Horizon length) : Problem definition
+        """
+        N_o = self.get_obstacles() #obstacle set
+        X_i = self.robots.get_states()[-1] #inital robot positions for MPC problem is current state
+        X_f = self.robots.goal() #final states for robots
+        N = 20 #planning horizon
+        M =(N_o,X_i,X_f,N)
+        node_solution =self.mpc.conflict_solve(M)
+        control_inputs = self.mpc.get_velocities(node_solution)
         
-        return self.mpc.control_inputs() 
-
+        # control_inputs = np.array([
+        #     [1,1],
+        #     [0,0],
+        #     [1,1],
+        #     [1,0]
+        # ])
+        return control_inputs
+#robot_0 purple
+#robot_1 blue
+#robot_2 green
+#robot_3 yellow
 
     def make_forces(self, force_configs):
         """Construct forces"""
@@ -140,7 +156,7 @@ class Simulator:
 
     def move_robot(self):
         """Move the robot one step"""
-        # self.robots.step(acc=self.calculate_acceleration())
+        self.robots.step(vel=self.calculte_u())
         #Generete reference paths for robots
 
  
@@ -148,5 +164,5 @@ class Simulator:
         """Step n time"""
         for _ in range(n):
             self.step_once() #pedestrian step update
+            self.move_robot() #Robot step update
         return self
-    
