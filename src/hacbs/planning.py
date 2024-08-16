@@ -43,7 +43,26 @@ class GridEnvironment:
         col = int((x - self.min_x) // self.grid_size)
         row = int((y - self.min_y) // self.grid_size)
         return (row, col)
-    
+    def inflate_obstacles(self, inflation_radius):
+        """Inflate obstacles in the occupancy grid by a given radius."""
+        inflated_grid = self.occupancy_grid.copy()
+
+        # Convert the inflation radius from meters to grid cells
+        inflation_cells = int(np.ceil(inflation_radius / self.grid_size))
+
+        for row in range(self.num_rows):
+            for col in range(self.num_cols):
+                if self.occupancy_grid[row, col]:  # If this cell is occupied
+                    # Inflate surrounding cells within the inflation radius
+                    for i in range(-inflation_cells, inflation_cells + 1):
+                        for j in range(-inflation_cells, inflation_cells + 1):
+                            new_row = row + i
+                            new_col = col + j
+                            # Check if the new cell is within the grid bounds
+                            if 0 <= new_row < self.num_rows and 0 <= new_col < self.num_cols:
+                                inflated_grid[new_row, new_col] = True
+        
+        self.occupancy_grid = inflated_grid
     def print_grid(self):
         """Print the occupancy grid for debugging."""
         print(self.occupancy_grid)
@@ -155,7 +174,7 @@ class Node:
         if len(obstacles):
             difference_matrix =  trajectory[:,np.newaxis,:2] - obstacles[np.newaxis,:,:]
             distance_matrix = np.linalg.norm(difference_matrix,axis=2)
-            bool_filter = distance_matrix >= self.D/2 + self.epsilon_o #+ delta_o 
+            bool_filter = distance_matrix >= self.D/2 + self.epsilon_o + delta_o 
             o_collision_tidx,o_idx = np.where(bool_filter==False)
         
         return o_collision_tidx, o_idx
@@ -196,20 +215,20 @@ class CBMPC:
         self.agents =0
         self.reference_paths=reference_paths
         # Define weights
-        self.Q = 3*np.diag([12.0, 12.0, 1.0])  # Weight for state tracking error
-        self.R = 0.1*np.diag([12.0, 0.05])       # Weight for control effort
-        self.P_term = np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
+        self.Q =5*np.diag([12.0, 12.0])  # Weight for state tracking error
+        self.R = np.diag([12.0, 0.05])       # Weight for control effort
+        self.P_term = np.diag([12.5,12.5])  # Weight for goal tracking error
         #constrint parameters
         self.epsilon_g = 0.2 #goal tolerance
-        self.D = 0.7#1.04 #robot footprint
+        self.D = 1.04 #robot footprint
         self.epsilon_r = 0.05 #robot robot collision tolerance   
         self.kr = 10e6 #inter robot collision tolerance slcak coefficient
         self.ko = 10e6 #obstacle collision tolerance slack coefficient
         self.epsilon_o = 0.05#robot-obstacle collision tolerance
         #mpc parameters
         self.T = 0.2 #mpc time step
-        self.nx = 3 #number of states [x,y,theta]
-        self.nu = 2 #number of controls [v, omega]
+        self.nx = 2 #number of states [x,y]
+        self.nu = 2 #number of controls [v_x,v_y]
 
         #create open list for solution
         self.o_list = []
@@ -262,12 +281,7 @@ class CBMPC:
             if precomputed_distances[i] >= target_distance:
                 return i
         return len(precomputed_distances) - 1  # Return the last point if the distance exceeds the path length
-    @staticmethod
-    def calculate_angle(p1, p2):
-        """Calculate the angle (theta) between two points p1 and p2."""
-        delta_x = p2[0] - p1[0]
-        delta_y = p2[1] - p1[1]
-        return np.arctan2(delta_y, delta_x)
+
     def get_obstacles_in_range(self,pos,obstacles)->np.ndarray:
         """
         Get obstacles in range of horizon
@@ -329,18 +343,10 @@ class CBMPC:
         linspace_x = np.interp(linspace, normalized_distances, x_coords)
         linspace_y = np.interp(linspace, normalized_distances, y_coords)
 
-        # Calculate theta (angle) for each segment
-        thetas = []
-        for i in range(len(section) - 1):
-            theta = self.calculate_angle(section[i], section[i + 1])
-            thetas.append(theta)
-        thetas.append(thetas[-1])  # Repeat the last angle for consistency with points
-
-        # Interpolate theta along the linspace
-        linspace_theta = np.interp(linspace, normalized_distances, thetas)
+        
 
         # Combine interpolated x, y coordinates, and theta into (x, y, theta) format
-        trajectory = np.column_stack((linspace_x, linspace_y, linspace_theta))
+        trajectory = np.column_stack((linspace_x, linspace_y))
 
         return trajectory
 
@@ -383,15 +389,15 @@ class CBMPC:
         #Define symbolic variables
         x = ca.SX.sym('x')
         y = ca.SX.sym('y')
-        theta = ca.SX.sym('theta')
-        states = ca.vertcat(x, y, theta)
-        v = ca.SX.sym('v')
-        omega = ca.SX.sym('omega')
-        controls = ca.vertcat(v, omega)
+    
+        states = ca.vertcat(x, y)
+        v_x = ca.SX.sym('v_x')
+        v_y= ca.SX.sym('v_y')
+        controls = ca.vertcat(v_x,v_y)
         delta_r = ca.SX.sym('delta_r')
         delta_o = ca.SX.sym('delta_o')
         # System dynamics
-        rhs = ca.vertcat(v*ca.cos(theta), v*ca.sin(theta), omega)
+        rhs = ca.vertcat(v_x,v_y)
 
         # Define the function f(x,u)
         f = ca.Function('f', [states, controls], [rhs])
@@ -435,13 +441,13 @@ class CBMPC:
 
         # State bounds
         for _ in range(N + 1):
-            lbx.extend([-ca.inf, -ca.inf, -ca.inf])
-            ubx.extend([ca.inf, ca.inf, ca.inf])
+            lbx.extend([-ca.inf, -ca.inf])
+            ubx.extend([ca.inf, ca.inf])
 
         # Control bounds
         for _ in range(N):
-            lbx.extend([-1.0, -np.pi / 4])  # v lower bound, omega lower bound
-            ubx.extend([1.0, np.pi / 4])    # v upper bound, omega upper bound
+            lbx.extend([-1.0, -1.0])  # vx lower bound, vy lower bound
+            ubx.extend([1.0, 1])    # v upper bound, omega upper bound
 
         # Obstacle constraint bounds
         lbx.extend([0.0])  # Lower bound for delta_r
@@ -537,32 +543,32 @@ class CBMPC:
 
 
 
-        # # Plot setup
-        if len(C):
-        #     # Convert ref_trajectory to numerical format
-            ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
+        # # # Plot setup
+        # if len(C):
+        # #     # Convert ref_trajectory to numerical format
+        #     ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
 
-        # Plotting and animation
-            def animate(i):
-                plt.clf()
-                plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
-                plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
-                plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
-                if len(C):
-                    r_obstacles = C[1]
-                    plt.scatter(r_obstacles[:,0],r_obstacles[:,1],color='black')
-                plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
-                plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
-                plt.xlabel('x')
-                plt.ylabel('y')
-                plt.title('Agent Path and Reference Trajectory')
-                plt.legend()
+        # # Plotting and animation
+        #     def animate(i):
+        #         plt.clf()
+        #         plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
+        #         plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
+        #         plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
+        #         if len(C):
+        #             r_obstacles = C[1]
+        #             plt.scatter(r_obstacles[:,0],r_obstacles[:,1],color='black')
+        #         plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
+        #         plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
+        #         plt.xlabel('x')
+        #         plt.ylabel('y')
+        #         plt.title('Agent Path and Reference Trajectory')
+        #         plt.legend()
 
-            fig = plt.figure()
-            ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
+        #     fig = plt.figure()
+        #     ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
 
-            ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
-            plt.show()
+        #     ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
+        #     plt.show()
 
         # Return solutions
         return [x_solution, u_solution, delta_r_solution, delta_o_solution]
@@ -669,20 +675,12 @@ class CBMPC:
             # Only use the first control input
             if len(u_solution) > 0:
                 # Extract the first control input
-                v = u_solution[0, 0]  # Linear velocity
-                omega = u_solution[0, 1]  # Angular velocity (not used directly here)
+                v_x = u_solution[0, 0]  # Linear velocity
+                v_y = u_solution[0, 1]  # Angular velocity (not used directly here)
                 
                 # Extract the initial orientation theta from the state trajectory
-                # Assuming the state trajectory is available and has at least one state
-                if len(solution[a_i][0]) > 0:
-                    theta = solution[a_i][0][0, 2]  # Orientation (angle) in radians
-                    
-                    # Compute vx and vy using theta
-                    vx = v * np.cos(theta)
-                    vy = v * np.sin(theta)
-                    
-                    # Append the computed velocities for this agent
-                    velocities.append([vx, vy])
+                
+                velocities.append([v_x, v_y])
         
         # Convert list of arrays into a single NumPy array
         velocity_vectors = np.array(velocities)
@@ -700,7 +698,7 @@ if __name__ == '__main__':
     obs = (obs -np.mean(obs))*map_endpoint_resolution+[1,1,2,2]
     obstacles = obs
     env = EnvState(obstacles,10)
-    min_x, max_x, min_y, max_y, grid_size = -12, 12, -12, 12, 1 # Example parameters
+    min_x, max_x, min_y, max_y, grid_size = -12, 12, -12, 12, 0.25 # Example parameters
     grid_env = GridEnvironment(min_x, max_x, min_y, max_y, grid_size)
 
     
@@ -728,6 +726,8 @@ if __name__ == '__main__':
             plt.scatter(p_o[0],p_o[1],color='black',s=1)
             grid_env.set_occupancy(p_o[0],p_o[1],True)
             
+    #inflate grid
+    grid_env.inflate_obstacles(0.2)
     # Find a path from start to goal
     start = (-7,-5)
     goal = (6,10)
@@ -749,16 +749,16 @@ if __name__ == '__main__':
         # print(path)
         path_x = [point[0] for point in path]
         path_y = [point[1] for point in path]
-        ax.scatter(path_x, path_y, c='blue', marker='o', label='Path')
+        ax.scatter(path_x, path_y, c='blue', marker='o', label='Path',s=1)
     ax.set_aspect('equal')
     ax.set_xlim(grid_env.min_x,grid_env.max_x)
     ax.set_ylim(grid_env.min_y,grid_env.max_y)
     # ax.grid()
     print(f"reference path vector {[path]}")
-    cbmpc = CBMPC(obstacles=obstacles,reference_paths=[path],N=10)
+    # cbmpc = CBMPC(obstacles=obstacles,reference_paths=[path],N=10)
 
     
-    cbmpc.MPC(M=None,a_i=None,C=None)
+    # cbmpc.MPC(M=None,a_i=None,C=None)
     plt.show()
 
 

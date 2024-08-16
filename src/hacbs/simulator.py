@@ -59,14 +59,15 @@ class Simulator:
         self.forces = self.make_forces(self.config)
 
         #descretization for planner
-        min_x, max_x, min_y, max_y, grid_size = -12, 12, -12, 12, 1 
+        min_x, max_x, min_y, max_y, grid_size = -15, 15, -15, 15, 0.25 
         self.grid_env = GridEnvironment(min_x,max_x,min_y,max_y,grid_size)
         #set occuppancy for obstacles
         for obstacle_poses in self.env.obstacles:
             for p_o in obstacle_poses:
                 self.grid_env.set_occupancy(p_o[0],p_o[1],True)
     
-
+        #inflate obstacles
+        self.grid_env.inflate_obstacles(0.32)
         #generate reference paths
         self.reference_paths =[]
         for robot in robot_state:

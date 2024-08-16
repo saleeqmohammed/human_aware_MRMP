@@ -266,7 +266,7 @@ class SceneVisualizer:
                 self.ax.plot(path_x, path_y,linestyle='--',alpha=0.5)
     def animation_init(self):
         self.plot_obstacles()
-        self.plot_reference_paths()
+        # self.plot_reference_paths()
         self.ax.add_collection(self.group_collection)
         self.ax.add_collection(self.human_collection)
         self.ax.add_collection(self.ellipse_collection)
