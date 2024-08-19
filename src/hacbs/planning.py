@@ -215,13 +215,13 @@ class CBMPC:
         self.agents =0
         self.reference_paths=reference_paths
         # Define weights
-        self.Q =5*np.diag([12.0, 12.0])  # Weight for state tracking error
-        self.R = np.diag([12.0, 0.05])       # Weight for control effort
+        self.Q =np.diag([12.0, 12.0])*0.1  # Weight for state tracking error
+        self.R = np.diag([12.0, 12.0])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5])  # Weight for goal tracking error
         #constrint parameters
-        self.epsilon_g = 0.2 #goal tolerance
+        self.epsilon_g = 0.02 #goal tolerance
         self.D = 1.04 #robot footprint
-        self.epsilon_r = 0.05 #robot robot collision tolerance   
+        self.epsilon_r = 0.15 #robot robot collision tolerance   
         self.kr = 10e6 #inter robot collision tolerance slcak coefficient
         self.ko = 10e6 #obstacle collision tolerance slack coefficient
         self.epsilon_o = 0.05#robot-obstacle collision tolerance
@@ -566,34 +566,34 @@ class CBMPC:
         delta_o_solution = sol_x[-1]  # Extract delta_o
 
 
-        def plotsol():
-            # # Plot setup
-            for C in Constarints:
-            #     # Convert ref_trajectory to numerical format
-                ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
 
-            # Plotting and animation
-                def animate(i):
-                    plt.clf()
-                    plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
-                    plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
-                    plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
-                    for C in Constarints:
-                        r_obstacles = C[1]
-                        plt.scatter(r_obstacles[:,0],r_obstacles[:,1],color='black')
-                        
-                    plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
-                    plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
-                    plt.xlabel('x')
-                    plt.ylabel('y')
-                    plt.title('Agent Path and Reference Trajectory')
-                    plt.legend()
+        # # Plot setup
+        # for C in Constarints:
+        # #     # Convert ref_trajectory to numerical format
+        #     ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
 
-                fig = plt.figure()
-                ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
+        # # Plotting and animation
+        #     def animate(i):
+        #         plt.clf()
+        #         plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
+        #         plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
+        #         plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
+        #         for C in Constarints:
+        #             r_obstacles = C[1]
+        #             plt.scatter(r_obstacles[:,0],r_obstacles[:,1],color='black')
+                    
+        #         plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
+        #         plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
+        #         plt.xlabel('x')
+        #         plt.ylabel('y')
+        #         plt.title('Agent Path and Reference Trajectory')
+        #         plt.legend()
 
-                ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
-                plt.show()
+        #     fig = plt.figure()
+        #     ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
+
+        #     ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
+        #     plt.show()
 
         # Return solutions
         return [x_solution, u_solution, delta_r_solution, delta_o_solution]
@@ -684,7 +684,6 @@ class CBMPC:
                     #to generate constraints, we need to get the x_solution for the second robot 
                     a_j = C_agents[i-1] #always selects the other sice there are only 2 elements
                     x_solution_aj,_,_,_ = P.solution[a_j]
-                    t_c,t_h = C[2]
                     try:
                         A.constraints[a_i].append((0,x_solution_aj,C[2]))
                     except:

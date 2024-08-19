@@ -76,7 +76,7 @@ class Simulator:
             path = self.grid_env.a_star(start,goal)
             self.reference_paths.append(path)
         #setup CB-MPC
-        self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=30)
+        self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=60)
 
 
         

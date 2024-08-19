@@ -180,7 +180,7 @@ class RobotState:
         #update state
         next_state = self.state
         #update position
-        next_state[:,0:2] +=desired_velocity*self.step_width
+        next_state[:,0:2] +=desired_velocity#*self.step_width
         #update velocity
         next_state[:,2:4] = desired_velocity
         self.update(next_state)
