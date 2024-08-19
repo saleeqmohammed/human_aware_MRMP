@@ -141,11 +141,13 @@ class GridEnvironment:
 
 
     
+
+    
 class Node:
     def __init__(self,epsilon_r,epsilon_o,D):
         self.cost = None
         self.solution = {}
-        self.constraints=None
+        self.constraints={}
         self.obstacles={}
         self.epsilon_r = epsilon_r
         self.epsilon_o = epsilon_o
@@ -156,7 +158,7 @@ class Node:
         inter robot collision
         ||P_j^k - P_i^k|| >= D + delta_r + epsilon_r
         """
-        bool_filter =np.linalg.norm(trajectory_i-trajectory_j,axis=1) >= self.D + delta_r + self.epsilon_r
+        bool_filter =np.linalg.norm(trajectory_i[:,:2]-trajectory_j[:,:2],axis=1) >= self.D + delta_r + self.epsilon_r
         r_collision_tidx = np.where(bool_filter==False)[0]
         return r_collision_tidx
     def check_obstacle_collision(self,obstacles,trajectory,delta_o):
@@ -174,7 +176,7 @@ class Node:
         if len(obstacles):
             difference_matrix =  trajectory[:,np.newaxis,:2] - obstacles[np.newaxis,:,:]
             distance_matrix = np.linalg.norm(difference_matrix,axis=2)
-            bool_filter = distance_matrix >= self.D/2 + self.epsilon_o #+ delta_o 
+            bool_filter = distance_matrix >= self.D/2 + self.epsilon_o + delta_o 
             o_collision_tidx,o_idx = np.where(bool_filter==False)
         
         return o_collision_tidx, o_idx
@@ -208,6 +210,7 @@ class Node:
 
 
 
+
 class CBMPC:
     def __init__(self,obstacles,reference_paths,N):
         self.obstacles = obstacles
@@ -215,12 +218,12 @@ class CBMPC:
         self.agents =0
         self.reference_paths=reference_paths
         # Define weights
-        self.Q = 3*np.diag([12.0, 12.0,0.05])  # Weight for state tracking error
+        self.Q = np.diag([12.0, 12.0,0.05])  # Weight for state tracking error
         self.R = 0.1*np.diag([12.0, 0.05])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
         #constrint parameters
         self.epsilon_g = 0.2 #goal tolerance
-        self.D = 0.7#1.04 #robot footprint
+        self.D = 2.04 #robot footprint
         self.epsilon_r = 0.05 #robot robot collision tolerance   
         self.kr = 10e6 #inter robot collision tolerance slcak coefficient
         self.ko = 10e6 #obstacle collision tolerance slack coefficient
@@ -378,7 +381,7 @@ class CBMPC:
                 hi = mid
         self.o_list.insert(lo, R)
     
-    def MPC(self,M,a_i,C)->list:
+    def MPC(self,M,a_i,Constraints)->list:
         """
         Model Predictive control subroutine
         MPC(M,a_i,C)
@@ -476,10 +479,11 @@ class CBMPC:
         ubg = lbg.copy()
 
 
+        
         # Additional collision constraints and bounds
-        if len(C): 
-        #if obstacles
-            if C[0]:
+        for C in Constraints: 
+        #if obstacles (1:obstacles, 0: robots)
+            if C[0]==1:
                 #static obstacles
                 t_c, t_h = C[2]
                 obs = C[1]
@@ -502,7 +506,27 @@ class CBMPC:
                 
                 # Add obstacle parameters to P
                 P = ca.vertcat(P, O_sym)
-
+            if C[0] == 0:
+                #robot collision
+                t_c,t_h = C[2]
+                #we need all xsolutions from tc to th
+                #at each of the times from tc to th the robot should be at constraint distance
+                x_j =C[1]
+                N_r = len(x_j)
+                R_sym = ca.SX.sym('R_sym',2*N_r)
+                R_pos = R_sym.reshape((2,N_r))
+                for l in range(t_c,t_h):
+                    #here the position of other robot p_r can be occuppied by the agent at some other time tl so no need to restric it with N_r X l constraiints
+                    st_pos = X[:2,l]
+                    p_r = R_pos[:2,l]
+                    distance_squared = ca.sumsqr(p_r-st_pos)
+                    rhs_lim = (self.D + delta_r + self.epsilon_r)**2
+                    #add constraint
+                    g.append(rhs_lim - distance_squared)
+                    #add bounds
+                    lbg.append(-ca.inf)
+                    ubg.append(0)
+                P = ca.vertcat(P,R_sym)
         # Finalize bounds
         lbg = ca.vertcat(*lbg)
         ubg = ca.vertcat(*ubg)
@@ -536,12 +560,16 @@ class CBMPC:
         
         trajectory = self.generate_reference(self.reference_paths[a_i], pos, 5, self.N + 1)
         goal = trajectory[-1]
-        if len(C):
-            r_obstacles = C[1]
-            # Flatten the trajectory into a single vector
-            p = np.concatenate((trajectory.flatten(), goal,r_obstacles.flatten()))
-        else:
-            p = np.concatenate((trajectory.flatten(), goal))
+        #add the defarult paraams for trajectory and goal
+        p = np.concatenate((trajectory.flatten(), goal))
+
+        for C in Constraints:
+            if C[0]==1:
+                r_obstacles = C[1]
+                p = np.concatenate((p,r_obstacles.flatten()))
+            if C[0]==0:
+                x_sol_j = C[1]
+                p = np.concatenate((p,x_sol_j.flatten()))
         # Initial guess
         x_init = np.zeros((nx * (N + 1) + nu * N + 2, 1))
         # Solve the problem
@@ -628,7 +656,7 @@ class CBMPC:
             obs_h = self.get_obstacles_in_range(pos,M[0])
             R.obstacles[a_i] =obs_h
             #solve the MPC problem
-            R.solution[a_i] = self.MPC(M,a_i,())
+            R.solution[a_i] = self.MPC(M,a_i,{}) #No additional constraints initially
         R.cost =self.SIC(R.solution,goals) #calculate SIC for solution trajectory
         print(f"R.cost: {R.cost}")
 
@@ -649,22 +677,37 @@ class CBMPC:
                 A.solution = P.solution
                 #get pre assigned obstacles
                 A.obstacles = P.obstacles
+                A.constraints = P.constraints
                 #add the new constraints
                 #constraint format (constraint_type=1( 1: obstacle, 0: robot),obstacles,[tc,th])
-                A.constraints = (1,A.obstacles[a_i],C[2])
-                A.solution[a_i] = self.MPC(M,a_i,A.constraints)
+                try:
+                    A.constraints[a_i].append((1,A.obstacles[a_i],C[2]))
+                except:
+                    A.constraints[a_i] = [(1,A.obstacles[a_i],C[2])]
+                A.solution[a_i] = self.MPC(M,a_i,A.constraints[a_i])
                 A.cost = self.SIC(A.solution,goals)
                 self.insert_node(A)
             else:
-                return P.solution
-                # #deal with robot-robot collision
-                # C_agents = [a_i,a_j]
-                # for a_i in C_agents:
-                #     A = Node(self.epsilon_r,self.epsilon_o,self.D)
-                #     A.constraints = P.constraints + ()
-                #     A.solution[a_i] = self.MPC(M,a_i,A.constraints)
-                #     A.cost = self.SIC(A.solution)
-                #     self.insert_node(A)
+            
+                #deal with robot-robot collision
+                C_agents = [a_i,a_j]
+                for i in range(len(C_agents)):
+                    a_i = C_agents[i]
+                    A = Node(self.epsilon_r,self.epsilon_o,self.D)
+                    A.solution = P.solution
+                    A.obstacles = P.obstacles
+                    A.constraints = P.constraints
+                    #to generate constraints, we need to get the x_solution for the second robot 
+                    a_j = C_agents[i-1] #always selects the other sice there are only 2 elements
+                    x_solution_aj,_,_,_ = P.solution[a_j]
+                    x_solution_aj = x_solution_aj[:,:2]
+                    try:
+                        A.constraints[a_i].append((0,x_solution_aj,C[2]))
+                    except:
+                        A.constraints[a_i] = [(0,x_solution_aj,C[2])]
+                    A.solution[a_i] = self.MPC(M,a_i,A.constraints[a_i])
+                    A.cost = self.SIC(A.solution,goals)
+                    self.insert_node(A)
 
     @staticmethod
     def get_velocities(solution: dict) -> np.ndarray:
