@@ -43,7 +43,26 @@ class GridEnvironment:
         col = int((x - self.min_x) // self.grid_size)
         row = int((y - self.min_y) // self.grid_size)
         return (row, col)
-    
+    def inflate_obstacles(self, inflation_radius):
+        """Inflate obstacles in the occupancy grid by a given radius."""
+        inflated_grid = self.occupancy_grid.copy()
+
+        # Convert the inflation radius from meters to grid cells
+        inflation_cells = int(np.ceil(inflation_radius / self.grid_size))
+
+        for row in range(self.num_rows):
+            for col in range(self.num_cols):
+                if self.occupancy_grid[row, col]:  # If this cell is occupied
+                    # Inflate surrounding cells within the inflation radius
+                    for i in range(-inflation_cells, inflation_cells + 1):
+                        for j in range(-inflation_cells, inflation_cells + 1):
+                            new_row = row + i
+                            new_col = col + j
+                            # Check if the new cell is within the grid bounds
+                            if 0 <= new_row < self.num_rows and 0 <= new_col < self.num_cols:
+                                inflated_grid[new_row, new_col] = True
+        
+        self.occupancy_grid = inflated_grid
     def print_grid(self):
         """Print the occupancy grid for debugging."""
         print(self.occupancy_grid)
@@ -196,7 +215,7 @@ class CBMPC:
         self.agents =0
         self.reference_paths=reference_paths
         # Define weights
-        self.Q = 3*np.diag([12.0, 12.0, 1.0])  # Weight for state tracking error
+        self.Q = 3*np.diag([12.0, 12.0,0.05])  # Weight for state tracking error
         self.R = 0.1*np.diag([12.0, 0.05])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
         #constrint parameters
@@ -537,32 +556,32 @@ class CBMPC:
 
 
 
-        # # Plot setup
-        if len(C):
-        #     # Convert ref_trajectory to numerical format
-            ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
+    # # Plot setup
+    #     if len(C):
+    #     #     # Convert ref_trajectory to numerical format
+    #         ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
 
-        # Plotting and animation
-            def animate(i):
-                plt.clf()
-                plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
-                plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
-                plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
-                if len(C):
-                    r_obstacles = C[1]
-                    plt.scatter(r_obstacles[:,0],r_obstacles[:,1],color='black')
-                plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
-                plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
-                plt.xlabel('x')
-                plt.ylabel('y')
-                plt.title('Agent Path and Reference Trajectory')
-                plt.legend()
+    #     # Plotting and animation
+    #         def animate(i):
+    #             plt.clf()
+    #             plt.plot(ref_trajectory_numerical[0, :], ref_trajectory_numerical[1, :], 'g--', label='Reference Trajectory')
+    #             plt.plot(x_solution[:, 0], x_solution[:, 1], 'b-', label='Agent Path')
+    #             plt.scatter(x_solution[i, 0], x_solution[i, 1], color='red')  # Current position of the agent
+    #             if len(C):
+    #                 r_obstacles = C[1]
+    #                 plt.scatter(r_obstacles[:,0],r_obstacles[:,1],color='black')
+    #             plt.xlim(min(ref_trajectory_numerical[0, :])-1, max(ref_trajectory_numerical[0, :])+1)
+    #             plt.ylim(min(ref_trajectory_numerical[1, :])-1, max(ref_trajectory_numerical[1, :])+1)
+    #             plt.xlabel('x')
+    #             plt.ylabel('y')
+    #             plt.title('Agent Path and Reference Trajectory')
+    #             plt.legend()
 
-            fig = plt.figure()
-            ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
+    #         fig = plt.figure()
+    #         ani = FuncAnimation(fig, animate, frames=N+1, interval=200, repeat=True)
 
-            ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
-            plt.show()
+    #         ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
+    #         plt.show()
 
         # Return solutions
         return [x_solution, u_solution, delta_r_solution, delta_o_solution]

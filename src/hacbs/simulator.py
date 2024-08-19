@@ -59,27 +59,56 @@ class Simulator:
         self.forces = self.make_forces(self.config)
 
         #descretization for planner
-        min_x, max_x, min_y, max_y, grid_size = -12, 12, -12, 12, 1 
+        min_x, max_x, min_y, max_y, grid_size = -15,15,-15,15,0.25
         self.grid_env = GridEnvironment(min_x,max_x,min_y,max_y,grid_size)
         #set occuppancy for obstacles
         for obstacle_poses in self.env.obstacles:
             for p_o in obstacle_poses:
                 self.grid_env.set_occupancy(p_o[0],p_o[1],True)
     
-
+        self.grid_env.inflate_obstacles(0.35)
         #generate reference paths
         self.reference_paths =[]
-        for robot in robot_state:
+        conflict_found = True
+        while conflict_found:
+            conflict_found = False
+            self.reference_paths=[]
+        for i in range(len(robot_state)):
+            robot = robot_state[i]
             start = (robot[0],robot[1])
             goal = (robot[4],robot[5])
             path = self.grid_env.a_star(start,goal)
             self.reference_paths.append(path)
+
+            #check for conflicts with previous paths
+            for j in range(i):
+                other_path = self.reference_paths[j]
+                for step in range(min(len(path),len(other_path))):
+                    if np.linalg.norm(np.array(path[step])-np.array(other_path[step])) < 0.7:
+                        conflict_found = True
+                        conflict_time = step
+                        conflict_pos = path[step]
+
+                        #block the conflicting cell at conflicting time
+                        x,y= conflict_pos
+                        self.grid_env.set_occupancy(x,y,True)
+                        path = self.grid_env.a_star(start,goal)
+                        self.reference_paths[i] = path
+
+                        self.grid_env.set_occupancy(x,y,False)
+
+                        break
+                if conflict_found:
+                    break
+
+
         #setup CB-MPC
         self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=30)
 
 
-        
-    
+    def check_reference_conflicts(self):
+            reference_paths = self.reference_paths
+            return self.reference_paths
     def calculte_u (self):
         """
         tuple M(Obstacle set, Initial robot positions, Final robot positions, Horizon length) : Problem definition
