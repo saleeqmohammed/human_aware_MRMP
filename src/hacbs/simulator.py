@@ -67,41 +67,58 @@ class Simulator:
                 self.grid_env.set_occupancy(p_o[0],p_o[1],True)
     
         #inflate obstacles
-        self.grid_env.inflate_obstacles(0.32)
+        self.grid_env.inflate_obstacles(0.6)
         conflict_found = True
-        while conflict_found:
-            conflict_found = False
-            self.reference_paths=[]
+        self.reference_paths=[]
+        #plan paths
         for i in range(len(robot_state)):
             robot = robot_state[i]
             start = (robot[0],robot[1])
             goal = (robot[4],robot[5])
             path = self.grid_env.a_star(start,goal)
             self.reference_paths.append(path)
+        #while there are conflicts
+    
+        n_itr = 0
+        while conflict_found or n_itr >=1000:
+            conflict_found= False
+            n_itr+=1
+            #replan paths
+            for i in range(len(robot_state)):
+                path = self.reference_paths[i]
+                #check for conflicts with previous paths
+                for j in range(i):
+                    other_path = self.reference_paths[j]
+                    for step in range(min(len(path),len(other_path))):
+                        #if conflict violated in step
+                        if np.linalg.norm(np.array(path[step])-np.array(other_path[step])) < 0.7:
+                            conflict_found = True
+                            conflict_time = step
+                            conflict_pos = path[step]
 
-            #check for conflicts with previous paths
-            for j in range(i):
-                other_path = self.reference_paths[j]
-                for step in range(min(len(path),len(other_path))):
-                    if np.linalg.norm(np.array(path[step])-np.array(other_path[step])) < 0.7:
-                        conflict_found = True
-                        conflict_time = step
-                        conflict_pos = path[step]
+                            #block the conflicting cell at conflicting time
+                            x,y= conflict_pos
+                            occuppancy = self.grid_env.occupancy_grid
 
-                        #block the conflicting cell at conflicting time
-                        x,y= conflict_pos
-                        self.grid_env.set_occupancy(x,y,True)
-                        path = self.grid_env.a_star(start,goal)
-                        self.reference_paths[i] = path
+                            self.grid_env.block_range(center_x=x,center_y=y,radius=1.5)
+                            path = self.grid_env.a_star(start,goal)
+                            self.reference_paths[i] = path
 
-                        self.grid_env.set_occupancy(x,y,False)
+                            self.grid_env.occupancy_grid = occuppancy
 
+                            break
+                        else:
+                            conflict_found=False
+                    #if conflict was found and corrected, break to start again 
+                    if conflict_found:
                         break
-                if conflict_found:
-                    break
-
+        if conflict_found:
+            print(f"No feasible gloabl plan after {n_itr} replanning iterations") 
+        else:
+            print("feasible global plan found")
         #setup CB-MPC
-        self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=60)
+        self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=30)
+
 
 
         
@@ -113,8 +130,9 @@ class Simulator:
         N_o = self.get_obstacles() #obstacle set
         X_i = self.robots.get_states()[-1] #inital robot positions for MPC problem is current state
         X_f = self.robots.goal() #final states for robots
+        X_h = self.peds.get_states()[0][-1]#initial human positions for MPC is current state
         N = 20 #planning horizon
-        M =(N_o,X_i,X_f,N)
+        M =(N_o,X_i,X_f,X_h,N)
         node_solution =self.mpc.conflict_solve(M)
         control_inputs = self.mpc.get_velocities(node_solution)
         

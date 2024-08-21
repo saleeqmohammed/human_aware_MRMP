@@ -1,7 +1,77 @@
 from pathlib import Path
 import numpy as np
 import hacbs as hs
+from hacbs.planning import GridEnvironment
+from hacbs.scene import EnvState
 import random
+import math
+
+def rectangle_with_diagonals(x, y, width, length):
+    # Calculate the half-width and half-length
+    half_width = width / 2
+    half_length = length / 2
+    
+    # Calculate the four corners of the rectangle
+    top_left = (x - half_width, y + half_length)
+    top_right = (x + half_width, y + half_length)
+    bottom_left = (x - half_width, y - half_length)
+    bottom_right = (x + half_width, y - half_length)
+    
+    # Calculate the lines of the rectangle
+    line1 = [top_left[0], top_right[0], top_left[1], top_right[1]]       # Top line
+    line2 = [top_right[0], bottom_right[0], top_right[1], bottom_right[1]] # Right line
+    line3 = [bottom_right[0], bottom_left[0], bottom_right[1], bottom_left[1]] # Bottom line
+    line4 = [bottom_left[0], top_left[0], bottom_left[1], top_left[1]]     # Left line
+    
+    # Calculate the diagonal lines of the rectangle
+    diagonal1 = [top_left[0], bottom_right[0], top_left[1], bottom_right[1]]  # Diagonal from top-left to bottom-right
+    diagonal2 = [top_right[0], bottom_left[0], top_right[1], bottom_left[1]]  # Diagonal from top-right to bottom-left
+    
+    # Return the lines including the diagonals
+    return [line1, line2, line3, line4, diagonal1, diagonal2]
+def generate_polygon(centroid, side_lengths):
+    num_sides = len(side_lengths)
+    
+    if num_sides < 3:
+        raise ValueError("A polygon must have at least 3 sides")
+    
+    # Centroid coordinates
+    cx, cy = centroid
+    
+    # Calculate the angle between each vertex (in radians)
+    angles = np.linspace(0, 2 * np.pi, num_sides + 1)[:-1]
+    
+    # Initialize the list of vertices
+    vertices = []
+    
+    # Initial angle (can start from any angle, here we start from 0)
+    current_angle = 0
+    
+    # Calculate each vertex based on the centroid, angle, and side length
+    for i in range(num_sides):
+        length = side_lengths[i % len(side_lengths)]  # If side_lengths has fewer elements, it will repeat
+        # Compute the position of the vertex
+        x = cx + length * np.cos(current_angle)
+        y = cy + length * np.sin(current_angle)
+        vertices.append((x, y))
+        
+        # Update the angle for the next vertex
+        if i < num_sides - 1:
+            next_length = side_lengths[(i + 1) % len(side_lengths)]
+            # Compute the angle for the next vertex using the cosine rule
+            angle_increment = np.arccos((length**2 + next_length**2 - length**2) / (2 * length * next_length))
+            current_angle += angle_increment
+    
+    # Form the polygon by connecting vertices
+    polygon_edges = []
+    for i in range(num_sides):
+        x1, y1 = vertices[i]
+        x2, y2 = vertices[(i + 1) % num_sides]
+        polygon_edges.append([x1, x2, y1, y2])
+    
+    return polygon_edges
+
+
 
 if __name__ == "__main__":
     # initial states, each entry is the position, velocity and goal of a pedestrian in the form of (px, py, vx, vy, gx, gy)
@@ -9,7 +79,7 @@ if __name__ == "__main__":
         [
             [2.0, -6.0, 0.5, -0.5, -3.0, 7.0], #blue
             [-4.5, 4.0, -0.5, 0.0, 5, -5.0], #cyan
-            [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
+            # [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
             # [1.0, 0.0, 0.0, 0.5, 2.0, 10.0],
             # [2.0, 0.0, 0.0, 0.5, 3.0, 10.0],
             # [3.0, 0.0, 0.0, 0.5, 4.0, 10.0],
@@ -21,14 +91,14 @@ if __name__ == "__main__":
     initial_robot_state = np.array(
         [
             #Warehouse config
-            # [5.0, 5.0,0.5,0.5,-7,0], #robot 1
+            [5.0, 5.0,0.5,0.5,-7,0], #robot 1
             # [10, -5,0.5,0.5,-2.0,5.0],#robot 2
-            # [-10, 0.0,0.5,0.5,10,0], #robot 3
+            [-10, 0.0,0.5,0.5,10,0], #robot 3
             # [-10.0, -5.0,0.5,0.5,5,5] #robot 4
             
             #crossover config
-            [-8,0,0.5,0,8,0],
-            [8,0,-0.5,0,-8,0]
+            # [-8,0,0.5,0,8,0],
+            # [8,0,-0.5,0,-8,0]
         ]
     )
     obs =np.load('/home/saleeq/Projects/PySocialForce/pysocialforce/line_endpoints.npy')
@@ -39,49 +109,129 @@ if __name__ == "__main__":
     #obstacle border lines
     # obs = (obs -np.mean(obs))*map_endpoint_resolution+[1,1,2,2]
     obs = []
+    def generate_random_env(n_items):
+        items=[]
+        for _ in range(n_items):
+            width =random.randint(1,10)
+            height = random.randint(1,10)
+            x = random.randint(math.ceil(-12+width/2) ,math.floor(12-width/2))
+            y = random.randint(math.ceil(-12+height/2),math.floor(12-height/2))
+            box = rectangle_with_diagonals(x,y=y,width=width,length=height)
+            items.append(box)
+        return items
 
-    #create an inventry of items
-    items = [
-        #box 1
-        [
-        [-1,1,1,1],
-        [1,1,-1,1],
-        [-1,1,-1,-1],
-        [-1,-1,-1,1]
-        ]
-    ]
+
+    #Define walls
     walls = np.array([
         [-12,12,12,12],
         [12,12,-12,12],
         [-12,12,-12,-12],
         [-12,-12,-12,12],
       
-    ])
+    ])  
+    
+    #create an inventry of items
+    box1 = rectangle_with_diagonals(x=0,y=0,width=2,length=2)
+    box2 = rectangle_with_diagonals(x=-5, y=8, width=8, length=2)
+    box3 = rectangle_with_diagonals(x=5,y=-5,width=6,length=4)
+    box4 = rectangle_with_diagonals(x=-7,y=8,width=2,length=2)
+    box5 = rectangle_with_diagonals(x=6,y=-8,width=1,length=4,)
+    box6 = rectangle_with_diagonals(x=4,y=-8,width=1,length=4,)
+    pent1 = generate_polygon((5,5),[2,4,5,3])
+    # hex1 = generate_polygon()
+    #put the items together to generate a problem                        
+    # items = generate_random_env(n_items=4)
+    items=[box1,pent1,box4,box2,box5,box6]#,box2,box3,box4,pent1]
+    
+    #put all the walls
+    for wall in walls:
+        print(f"wall {wall}")
+        obs.append(wall)
 
- #put all the walls
-for wall in walls:
-    print(f"wall {wall}")
-    obs.append(wall)
-for item in items:
-    for line in item:
-        obs.append(line)
+    for item in items:
+        for line in item:
+            print(f"Obstacle line added: {line}")
+            obs.append(line)
 
-obs = np.array(obs)
-        
+    obs = np.array(obs)
+
+    '''
+    Check feasibility of the arrangement
+    '''
+    env = EnvState(obstacles=obs,resolution=10)
+    min_x, max_x, min_y, max_y, grid_size = -15, 15, -15, 15, 0.25 
+    grid_env = GridEnvironment(min_x,max_x,min_y,max_y,grid_size)
+    #set occuppancy for obstacles
+    for obstacle_poses in env.obstacles:
+        for p_o in obstacle_poses:
+            grid_env.set_occupancy(p_o[0],p_o[1],True)
+
+    #inflate obstacles
+    grid_env.inflate_obstacles(0.6)
+    occuppancy = grid_env.occupancy_grid
+    occuppancy_fraction = np.sum(occuppancy)/occuppancy.size
+    print(f"grid occupancy: {100*occuppancy_fraction}%")
+        #     reference_paths =[]
+        #     #plan paths
+        #     for i in range(len(initial_robot_state)):
+        #         robot = initial_robot_state[i]
+        #         start = (robot[0],robot[1])
+        #         goal = (robot[4],robot[5])
+        #         path = grid_env.a_star(start,goal)
+        #         reference_paths.append(path)
+        #     return grid_env,obs,reference_paths
+        # grid_env,obs,reference_paths =generate_problem()
+  
+        # for path in reference_paths:
+        #     if len(path) <1:
+        #         generate_problem()
+
+        # n_itr = 1000
+        # while conflict_found:
+        #     conflict_found = False
+        #     n_itr+=1
+        #     #replan paths
+        #     for i in range(len(initial_robot_state)):
+        #         path = reference_paths[i]
+        #         #check conflict with previous paths  
+        #         for j in range(i):
+        #             other_path = reference_paths[j]
+        #             for step in range(min(len(path),len(other_path))):
+        #                 if np.linalg.norm(np.array(path[step])-np.array(other_path[step])) < 0.7:
+        #                     conflict_found = True
+        #                     conflict_time = step
+        #                     conflict_pos = path[step]
+
+        #                     #block the conflicting cell at conflicting time
+        #                     occuppancy = grid_env.occupancy_grid
+
+        #                     x,y= conflict_pos
+        #                     grid_env.block_range(x,y,1.0)
+        #                     path = grid_env.a_star(start,goal)
+        #                     reference_paths[i] = path
+
+        #                     grid_env.occupancy_grid = occuppancy
+        #                     # grid_env.inflate_obstacles(0.2)
+
+        #                     break
+        #                 else:
+        #                     conflict_found = False
+        #             if conflict_found:
+        #                 break
 
    
 
-# initiate the simulator,
-s = hs.Simulator(
-    initial_ped_state,
-    initial_robot_state,
-    groups=groups,
-    obstacles=obs,
-    config_file=Path(__file__).resolve().parent.joinpath("simulation.toml"),
-)
-# update 80 steps
-s.step(60)
-
-with hs.plot.SceneVisualizer(s, "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output") as sv:
-    sv.animate()
-    # sv.plot()
+    # initiate the simulator,
+    s = hs.Simulator(
+        initial_ped_state,
+        initial_robot_state,
+        groups=groups,
+        obstacles=obs,
+        config_file=Path(__file__).resolve().parent.joinpath("simulation.toml"),
+    )
+    # update 80 steps
+    s.step(60)
+    human_colors = len(initial_ped_state)*['red']
+    with hs.plot.SceneVisualizer(scene=s,output= "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output",agent_colors=human_colors) as sv:
+        sv.animate()
+        # sv.plot()

@@ -64,12 +64,13 @@ class SceneVisualizer:
     """Context for social nav visualization"""
 
     def __init__(
-        self, scene, output=None, writer="imagemagick", cmap="viridis", agent_colors=None, **kwargs
+        self, scene, output=None, writer="imagemagick", cmap="viridis", agent_colors=None, robot_colors =None,**kwargs
     ):
         self.scene = scene
         self.states, self.group_states,self.robot_states = self.scene.get_states()
         self.cmap = cmap
         self.agent_colors = agent_colors
+        self.robot_colors = robot_colors
         self.frames = self.scene.get_length()
         self.output = output
         self.writer = writer
@@ -96,7 +97,7 @@ class SceneVisualizer:
 
         self.ellipse_actors = []
         self.ellipse_collection = PatchCollection([])
-        self.ellipse_collection.set(animated=True, alpha=0.2, edgecolors="red",linewidth=0.25, facecolors="none")
+        self.ellipse_collection.set(animated=True, alpha=0.5, edgecolors="red",linewidth=0.5, facecolors="none")
 
         self.robot_actors=None
         self.robot_collection = PatchCollection([])
@@ -230,8 +231,8 @@ class SceneVisualizer:
             # print(v_)
             ellipse = Ellipse(
                 xy=state[:2],
-                width=0.6, #2b
-                height=0.3, #2a
+                width=0.52, #2b
+                height=1.04, #2a
                 angle=np.degrees(np.arctan2(state[3], state[2]))
             )
             self.ellipse_actors.append(ellipse)
@@ -252,10 +253,10 @@ class SceneVisualizer:
                 Circle(pos,radius=r) for pos,r in zip(current_state[:,:2],radius)
             ]
         self.robot_collection.set_paths(self.robot_actors)
-        if not self.agent_colors:
+        if not self.robot_colors:
             self.robot_collection.set_array(np.arange(current_state.shape[0]))
         else:
-            self.robot_collection.set_facecolor(self.agent_colors)
+            self.robot_collection.set_facecolor(self.robot_colors)
         self.ax.add_collection(self.robot_collection)
 
     def plot_reference_paths(self):

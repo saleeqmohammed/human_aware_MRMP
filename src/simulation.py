@@ -9,7 +9,7 @@ if __name__ == "__main__":
         [
             [2.0, -6.0, 0.5, -0.5, -3.0, 7.0], #blue
             [-4.5, 4.0, -0.5, 0.0, 5, -5.0], #cyan
-            [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
+            # [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
             # [1.0, 0.0, 0.0, 0.5, 2.0, 10.0],
             # [2.0, 0.0, 0.0, 0.5, 3.0, 10.0],
             # [3.0, 0.0, 0.0, 0.5, 4.0, 10.0],
@@ -22,13 +22,13 @@ if __name__ == "__main__":
         [
             #Warehouse config
             # [5.0, 5.0,0.5,0.5,-7,0], #robot 1
-            # [10, -5,0.5,0.5,-2.0,5.0],#robot 2
+            [10, -5,0.5,0.5,-2.0,5.0],#robot 2
             # [-10, 0.0,0.5,0.5,10,0], #robot 3
-            # [-10.0, -5.0,0.5,0.5,5,5] #robot 4
+            [-10.0, -5.0,0.5,0.5,5,5] #robot 4
             
             #crossover config
-            [-8,0,0.5,0,8,0],
-            [8,0,-0.5,0,-8,8]
+            # [-8,0,0.5,0,8,0],
+            # [8,0,-0.5,0,-8,8]
         ]
     )
     obs =np.load('/home/saleeq/Projects/PySocialForce/pysocialforce/line_endpoints.npy')
@@ -38,12 +38,12 @@ if __name__ == "__main__":
 
     #obstacle border lines
     obs = (obs -np.mean(obs))*map_endpoint_resolution+[1,1,2,2]
-    obs = np.array([
-        [-12,12,12,12],
-        [12,12,-12,12],
-        [-12,12,-12,-12],
-        [-12,-12,-12,12]
-    ])
+    # obs = np.array([
+    #     [-12,12,12,12],
+    #     [12,12,-12,12],
+    #     [-12,12,-12,-12],
+    #     [-12,-12,-12,12]
+    # ])
 
  
 
@@ -107,6 +107,6 @@ if __name__ == "__main__":
     # update 80 steps
     s.step(60)
 
-    with hs.plot.SceneVisualizer(s, "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output") as sv:
+    with hs.plot.SceneVisualizer(s, "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output2") as sv:
         sv.animate()
         # sv.plot()

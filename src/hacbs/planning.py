@@ -37,7 +37,27 @@ class GridEnvironment:
         """Set the occupancy of the cell containing (x, y)."""
         row, col = self._get_cell_indices(x, y)
         self.occupancy_grid[row, col] = occupied
+    def is_within_bounds(self,x,y):
+        is_within_bounds= True
+        if x <= self.min_x or x>= self.max_x:
+            is_within_bounds = False
+        if y<= self.min_y or y>=self.max_y:
+            is_within_bounds = False
+        return is_within_bounds
     
+    def block_range(self, center_x, center_y, radius):
+        """Block cells within a given radius around a center point (center_x, center_y)."""
+        center_row, center_col = self._get_cell_indices(center_x, center_y)
+        inflation_cells = int(np.ceil(radius / self.grid_size))
+
+        for row in range(center_row - inflation_cells, center_row + inflation_cells + 1):
+            for col in range(center_col - inflation_cells, center_col + inflation_cells + 1):
+                if 0 <= row < self.num_rows and 0 <= col < self.num_cols:
+                    # Calculate the actual distance from the center in grid units
+                    cell_center_x, cell_center_y = self.get_cell_center(row, col)
+                    if np.linalg.norm(np.array([cell_center_x, cell_center_y]) - np.array([center_x, center_y])) <= radius:
+                        self.set_occupancy(cell_center_x, cell_center_y, True)
+
     def _get_cell_indices(self, x, y):
         """Convert (x, y) coordinates to grid cell indices."""
         col = int((x - self.min_x) // self.grid_size)
@@ -147,9 +167,11 @@ class Node:
         self.solution = {}
         self.constraints={}
         self.obstacles={}
+        self.humans =[]
         self.epsilon_r = epsilon_r
         self.epsilon_o = epsilon_o
-        self.D = D
+        self.D = 1.0#D
+        self.HSA = 1.0
     def check_robot_collision(self,trajectory_i,trajectory_j,delta_r):
         """
         Constriant 3:
@@ -178,6 +200,18 @@ class Node:
             o_collision_tidx,o_idx = np.where(bool_filter==False)
         
         return o_collision_tidx, o_idx
+    def check_human_collision(self,trajectory,humans,delta_h):
+        """
+        Check collision between humans and agent
+        Input: trajectory of agent, human positions, delta_h slack
+        """
+        h_collision_tidx = []
+        h_idx = []
+        difference_matrix = trajectory[:,np.newaxis,:2] - humans[np.newaxis,:,:]
+        distance_matrix = np.linalg.norm(difference_matrix,axis=2)
+        bool_filter = distance_matrix >= self.HSA + delta_h
+        h_collision_tidx,h_idx =np.where(bool_filter==False)
+        return h_collision_tidx,h_idx
     def conflicts(self):
         """  
         Return the list of conflicts in given solution node
@@ -187,7 +221,7 @@ class Node:
         N_a = len(self.solution.keys())
         for a_i in range(N_a):
             #check obstacle collision for each agent
-            x_solution_i,_,delta_r_i,delta_o_i = self.solution[a_i]
+            x_solution_i,_,delta_r_i,delta_o_i,delta_h_i = self.solution[a_i]
             o_collision_tidx,o_collision_oidx =self.check_obstacle_collision(self.obstacles[a_i],x_solution_i,delta_o_i)
             #if there is collision add conflict
             if len(o_collision_tidx):
@@ -196,7 +230,7 @@ class Node:
                 conflicts.append((a_i,-1,[t_c,t_h]))
             #check collision with every other robot
             for a_j in range(a_i+1,N_a):
-                x_solution_j,_,delta_r_j,delta_o_j = self.solution[a_j]
+                x_solution_j,_,delta_r_j,delta_o_j,delta_h_j = self.solution[a_j]
                 delta_r = max(delta_r_i,delta_r_j)
                 r_collision_tidx =self.check_robot_collision(x_solution_i,x_solution_j,delta_r)
                 #if there is collision add conflict
@@ -204,7 +238,18 @@ class Node:
                     t_c = r_collision_tidx[0]
                     t_h = len(x_solution_i)
                     conflicts.append((a_i,a_j,[t_c,t_h]))
-        return conflicts
+            #check collision with humans
+            if len(self.humans):
+                humans = self.humans[:,:2]
+                h_collision_tidx,h_collision_h_idx = self.check_human_collision(x_solution_i,humans,delta_h_i)
+                #if there is collision add conflict
+                if len(h_collision_tidx):
+                    t_c = h_collision_tidx[0]
+                    t_h = len(x_solution_i)
+                    conflicts.append((a_i,-2,[t_c,t_h]))
+        #sort conflicts with earliest tc first
+        conflicts_sorted = sorted(conflicts,key=lambda x: x[2][0])
+        return conflicts_sorted
 
 
 
@@ -215,16 +260,19 @@ class CBMPC:
         self.agents =0
         self.reference_paths=reference_paths
         # Define weights
-        self.Q =np.diag([12.0, 12.0])*0.1  # Weight for state tracking error
-        self.R = np.diag([12.0, 12.0])       # Weight for control effort
+        self.Q =3*np.diag([12.0, 12.0]) # Weight for state tracking error
+        self.R = 8*np.diag([12.0, 12.0])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5])  # Weight for goal tracking error
         #constrint parameters
         self.epsilon_g = 0.02 #goal tolerance
         self.D = 1.04 #robot footprint
-        self.epsilon_r = 0.15 #robot robot collision tolerance   
+        self.HSA = 1.1 #human safety area
+        self.epsilon_r = 0.08 #robot robot collision tolerance   
         self.kr = 10e6 #inter robot collision tolerance slcak coefficient
-        self.ko = 10e6 #obstacle collision tolerance slack coefficient
+        self.ko = 10e18 #obstacle collision tolerance slack coefficient
+        self.kh = 10e8 #human robot collision tolereance slack coefficient
         self.epsilon_o = 0.05#robot-obstacle collision tolerance
+        self.epsilon_hsa = 0.05 #human robot collision tolerance
         #mpc parameters
         self.T = 0.2 #mpc time step
         self.nx = 2 #number of states [x,y]
@@ -295,7 +343,15 @@ class CBMPC:
             if obstacle_dists[min_dist_idx] < 5:
                 # print(f"Added obstacle point {obstacle[min_dist_idx]} at distance: {obstacle_dists[min_dist_idx]}")
                 #we will take only the closest point in the obstacle to plan for collision
-                obstacles_inrange.append(obstacle[min_dist_idx])
+                obstacles_inrange.append(obstacle[min_dist_idx].tolist())
+                obstacles_inrange.append(obstacle[0].tolist())
+                obstacles_inrange.append(obstacle[-1].tolist())
+                #add some more points from the same obstacle
+                obstacle_length = obstacle.shape[0]
+                sample_length = obstacle_length//10
+                sample_indeces = np.random.choice(obstacle.shape[0],size=sample_length,replace=False)
+                sample_array= obstacle[sample_indeces]
+                obstacles_inrange.extend(sample_array.tolist())
         return np.array(obstacles_inrange)
     def generate_reference(self,path, coordinate, distance, N, precomputed_distances=None):
         """
@@ -386,6 +442,7 @@ class CBMPC:
         P_term = self.P_term
         kr = self.kr
         ko = self.ko
+        kh = self.kh
         #Define symbolic variables
         x = ca.SX.sym('x')
         y = ca.SX.sym('y')
@@ -396,6 +453,7 @@ class CBMPC:
         controls = ca.vertcat(v_x,v_y)
         delta_r = ca.SX.sym('delta_r')
         delta_o = ca.SX.sym('delta_o')
+        delta_hsa = ca.SX.sym('delta_hsa')
         # System dynamics
         rhs = ca.vertcat(v_x,v_y)
 
@@ -427,7 +485,7 @@ class CBMPC:
             st = X[:, k]
             con = U[:, k]
             # Cost function: weighted state deviation from trajectory + weighted control effort + terminal cost
-            obj += ca.mtimes([(st - ref_trajectory[:, k]).T, Q, (st - ref_trajectory[:, k])]) + ca.mtimes([con.T, R, con]) + ca.mtimes([(X[:,N]-goal_state).T,P_term,(X[:,N]-goal_state)]) + kr*delta_r + ko*delta_o
+            obj += ca.mtimes([(st - ref_trajectory[:, k]).T, Q, (st - ref_trajectory[:, k])]) + ca.mtimes([con.T, R, con]) + kr*delta_r + ko*delta_o + kh*delta_hsa +ca.mtimes([(X[:,N]-goal_state).T,P_term,(X[:,N]-goal_state)]) #ca.mtimes([(X[:,N]).T,P_term,(X[:,N])])
             st_next = X[:, k+1]
             f_value = f(st, con)
             st_next_euler = st + T*f_value
@@ -454,7 +512,8 @@ class CBMPC:
         ubx.extend([ca.inf])  # Upper bound for delta_r
         lbx.extend([0.0])  # Lower bound for delta_o
         ubx.extend([ca.inf])  # Upper bound for delta_o
-
+        lbx.extend([0.0]) #Lower bound for delta_hsa
+        ubx.extend([ca.inf])# Upper bound for delta_hsa
         lbx = ca.vertcat(*lbx)
         ubx = ca.vertcat(*ubx)
 
@@ -510,12 +569,34 @@ class CBMPC:
                     lbg.append(-ca.inf)
                     ubg.append(0)
                 P = ca.vertcat(P,R_sym)
+            if C[0] == 2:
+                #human collision
+                t_c,t_h =C[2]
+                humans = C[1]
+                N_h = len(humans)
+                #Define human positons in symbolic variables
+                H_sym = ca.SX.sym('H_sym',2*N_h)
+                H_pos = H_sym.reshape((2,N_h))
+                for l in range(t_c,t_h):
+                    for h_idx in range(N_h):
+                        st_pos = X[:2, l]
+                        p_h = H_pos[:, h_idx]
+                        distance_squared = ca.sumsqr(p_h - st_pos)
+                        rhs_lim = ((self.HSA + delta_hsa)) ** 2
+                        # Add constraint
+                        g.append(rhs_lim - distance_squared)
+                        # Add bounds
+                        lbg.append(-ca.inf)
+                        ubg.append(0)
+                
+                # Add obstacle parameters to P
+                P = ca.vertcat(P, H_sym)
         # Finalize bounds
         lbg = ca.vertcat(*lbg)
         ubg = ca.vertcat(*ubg)
 
         # Define optimization variables
-        OPT_variables = ca.vertcat(ca.reshape(X, nx * (N + 1), 1), ca.reshape(U, nu * N, 1), delta_r, delta_o)
+        OPT_variables = ca.vertcat(ca.reshape(X, nx * (N + 1), 1), ca.reshape(U, nu * N, 1), delta_r, delta_o,delta_hsa)
 
         # Define NLP problem
         nlp_prob = {
@@ -553,23 +634,27 @@ class CBMPC:
             if C[0]==0:
                 x_sol_j = C[1]
                 p = np.concatenate((p,x_sol_j.flatten()))
+            if C[0]==2:
+                p_humans = C[1]
+                p = np.concatenate((p,p_humans.flatten()))
         # Initial guess
-        x_init = np.zeros((nx * (N + 1) + nu * N + 2, 1))
+        x_init = np.zeros((nx * (N + 1) + nu * N + 3, 1))
         # Solve the problem
         sol = solver(x0=x_init, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=p)
 
         # Extract solution
         sol_x = sol['x'].full().flatten()
         x_solution = sol_x[:nx * (N + 1)].reshape((N + 1, nx))
-        u_solution = sol_x[nx * (N + 1):-2].reshape((N, nu))
-        delta_r_solution = sol_x[-2]  # Extract delta_r
-        delta_o_solution = sol_x[-1]  # Extract delta_o
+        u_solution = sol_x[nx * (N + 1):-3].reshape((N, nu))
+        delta_r_solution = sol_x[-3]  # Extract delta_r
+        delta_o_solution = sol_x[-2]  # Extract delta_o
+        delta_h_solution = sol_x[-1] #TODO: Extract delta_h
 
 
 
         # # Plot setup
         # for C in Constarints:
-        # #     # Convert ref_trajectory to numerical format
+        #     # Convert ref_trajectory to numerical format
         #     ref_trajectory_numerical = trajectory.T  # Transpose to match shape (nx, N+1)
 
         # # Plotting and animation
@@ -595,8 +680,8 @@ class CBMPC:
         #     ani.save(f'animation{a_i}.gif',writer='pillow',fps=5)
         #     plt.show()
 
-        # Return solutions
-        return [x_solution, u_solution, delta_r_solution, delta_o_solution]
+        #Return solutions
+        return [x_solution, u_solution, delta_r_solution, delta_o_solution,delta_h_solution]
 
 
     def SIC(self,solution,goals):
@@ -630,6 +715,7 @@ class CBMPC:
         goals = np.squeeze(M[2]) #X_f
         print(f"number of agents:{self.agents}")
         R = Node(self.epsilon_r,self.epsilon_o,self.D)
+        R.humans = np.squeeze(M[3])
         for a_i in range(self.agents):
             print(f"Solving for agent: {a_i}")
             #Find the obstacles in planned MPC horizon
@@ -639,6 +725,7 @@ class CBMPC:
             #get obstacles set from M
             obs_h = self.get_obstacles_in_range(pos,M[0])
             R.obstacles[a_i] =obs_h
+            #get humans from M
             #solve the MPC problem
             R.solution[a_i] = self.MPC(M,a_i,{}) #No additional constraints initially
         R.cost =self.SIC(R.solution,goals) #calculate SIC for solution trajectory
@@ -658,10 +745,10 @@ class CBMPC:
                 A = Node(self.epsilon_r,self.epsilon_o,self.D)
 
                 #start with precalculated solutions
-                A.solution = P.solution
+                A.solution = P.solution.copy()
                 #get pre assigned obstacles
-                A.obstacles = P.obstacles
-                A.constraints = P.constraints
+                A.obstacles = P.obstacles.copy()
+                A.constraints = P.constraints.copy()
                 #add the new constraints
                 #constraint format (constraint_type=1( 1: obstacle, 0: robot),obstacles,[tc,th])
                 try:
@@ -671,25 +758,45 @@ class CBMPC:
                 A.solution[a_i] = self.MPC(M,a_i,A.constraints[a_i])
                 A.cost = self.SIC(A.solution,goals)
                 self.insert_node(A)
+            elif a_j== -2:
+                #deal with human collision
+                A = Node(self.epsilon_r,self.epsilon_o,self.D)
+
+                #start with precalculated solutions
+                A.solution = P.solution.copy()
+                #get pre assigned obstacles
+                A.obstacles = P.obstacles.copy()
+                #get humans
+                A.humans = P.humans.copy()
+                #Copy constraints
+                A.constraints = P.constraints.copy()
+                #add the new constraints
+                #constraint format (constraint_type=1( 1: obstacle, 0: robot,  2:human),obstacles,[tc,th])
+                try:
+                    A.constraints[a_i].append((2,A.humans[:,:2],C[2]))
+                except:
+                    A.constraints[a_i] = [(2,A.humans[:,:2],C[2])]
+                A.solution[a_i] = self.MPC(M,a_i,A.constraints[a_i])
+                A.cost = self.SIC(A.solution,goals)
+                self.insert_node(A)
             else:
-            
                 #deal with robot-robot collision
                 C_agents = [a_i,a_j]
                 for i in range(len(C_agents)):
                     a_i = C_agents[i]
                     A = Node(self.epsilon_r,self.epsilon_o,self.D)
-                    A.solution = P.solution
-                    A.obstacles = P.obstacles
-                    A.constraints = P.constraints
+                    A.solution = P.solution.copy()
+                    A.obstacles = P.obstacles.copy()
+                    A.constraints = P.constraints.copy()
                     #to generate constraints, we need to get the x_solution for the second robot 
                     a_j = C_agents[i-1] #always selects the other sice there are only 2 elements
-                    x_solution_aj,_,_,_ = P.solution[a_j]
+                    x_solution_aj,_,_,_,_ = P.solution[a_j].copy()
                     try:
                         A.constraints[a_i].append((0,x_solution_aj,C[2]))
                     except:
                         A.constraints[a_i] = [(0,x_solution_aj,C[2])]
                     A.solution[a_i] = self.MPC(M,a_i,A.constraints[a_i])
-                    A.cost = self.SIC(A.solution,goals)
+                    A.cost = self.SIC(A.solution,goals) 
                     self.insert_node(A)
 
     @staticmethod
@@ -709,7 +816,7 @@ class CBMPC:
         
         for a_i in solution.keys():
             # Extract state trajectory and control inputs for the agent
-            _, u_solution,_,_ = solution[a_i]
+            _, u_solution,_,_ ,_= solution[a_i]
             
             # Only use the first control input
             if len(u_solution) > 0:

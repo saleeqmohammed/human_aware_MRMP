@@ -7,8 +7,30 @@
     
      <!-- map-->
     <arg name="map_file" default="$(find warehouse_simulation)/maps/general_map.yaml"/>
-
-    <!-- Run the map server -->
+<!-- Run the map server -->
     <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+    
+    <group ns="robot_0">
+      <node pkg="amcl" type="amcl" name="amcl">
+        <remap from="scan" to="robot_0/base_scan"/>
+        <remap from="initialpose" to="robot_0/initialpose"/>
+        <remap from="amcl_pose" to="robot_0/amcl_pose"/>
+        <remap from="particlecloud" to="robot_0/particlecloud"/>
+        <param name="odom_frame_id" value="robot_0/odom"/>
+        <param name="base_frame_id" value="robot_0/base_footprint"/>
+        <parm name="map" value="map"/>
+      </node>
+    </group>
+       <group ns="robot_1">
+      <node pkg="amcl" type="amcl" name="amcl">
+        <remap from="scan" to="robot_1/base_scan"/>
+        <remap from="initialpose" to="robot_1/initialpose"/>
+        <remap from="amcl_pose" to="robot_1/amcl_pose"/>
+        <remap from="particlecloud" to="robot_1/particlecloud"/>
+        <param name="odom_frame_id" value="robot_1/odom"/>
+        <param name="base_frame_id" value="robot_1/base_footprint"/>
+      </node>
+    </group>
+
 
 </launch>
