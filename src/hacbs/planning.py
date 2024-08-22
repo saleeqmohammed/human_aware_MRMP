@@ -243,14 +243,14 @@ class CBMPC:
         self.reference_paths=reference_paths
         # Define weights
         self.Q = np.diag([12.0, 12.0,0.05])  # Weight for state tracking error
-        self.R = 0.1*np.diag([12.0, 0.05])       # Weight for control effort
+        self.R = np.diag([12.0, 0.005])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
         self.HSA = 1.04
         #constrint parameters
         self.epsilon_g = 0.2 #goal tolerance
         self.D = 1.04 #robot footprint
-        self.epsilon_r = 0.05 #robot robot collision tolerance   
-        self.kr = 10e6 #inter robot collision tolerance slcak coefficient
+        self.epsilon_r = 0.09 #robot robot collision tolerance   
+        self.kr = 10e28 #inter robot collision tolerance slcak coefficient
         self.ko = 10e6 #obstacle collision tolerance slack coefficient
         self.kh=10e10 #robot- human collision tolerance slack coefficient
         self.epsilon_o = 0.05#robot-obstacle collision tolerance
@@ -492,8 +492,8 @@ class CBMPC:
 
         # Control bounds
         for _ in range(N):
-            lbx.extend([-1.0, -np.pi / 4])  # v lower bound, omega lower bound
-            ubx.extend([1.0, np.pi / 4])    # v upper bound, omega upper bound
+            lbx.extend([-0.5, -np.pi / 4])  # v lower bound, omega lower bound
+            ubx.extend([0.5, np.pi / 4])    # v upper bound, omega upper bound
 
         # Obstacle constraint bounds
         lbx.extend([0.0])  # Lower bound for delta_r
@@ -623,7 +623,7 @@ class CBMPC:
                 p = np.concatenate((p,r_obstacles.flatten()))
             if C[0]==0:
                 x_sol_j = C[1]
-                p = np.concatenate((p,x_sol_j.flatten()))
+                p = np.concatenate((p,x_sol_j[:,:2].flatten()))
             if C[0]==2:
                 p_humans = C[1]
                 p = np.concatenate((p,p_humans.flatten()))
@@ -671,6 +671,7 @@ class CBMPC:
         #     plt.show()
 
         #Return solutions
+        print(f"delta_hsa: {delta_h_solution} delta_o: {delta_o_solution} delta_r: {delta_r_solution}")
         return [x_solution, u_solution, delta_r_solution, delta_o_solution,delta_h_solution]
 
 
