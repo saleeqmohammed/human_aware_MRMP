@@ -245,6 +245,7 @@ class CBMPC:
         self.Q = np.diag([12.0, 12.0,0.05])  # Weight for state tracking error
         self.R = 0.1*np.diag([12.0, 0.05])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5,10.0])  # Weight for goal tracking error
+        self.HSA = 1.04
         #constrint parameters
         self.epsilon_g = 0.2 #goal tolerance
         self.D = 1.04 #robot footprint

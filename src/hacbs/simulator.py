@@ -110,24 +110,25 @@ class Simulator:
             reference_paths = self.reference_paths
             return self.reference_paths
     def calculte_u (self):
-        """
-        tuple M(Obstacle set, Initial robot positions, Final robot positions, Horizon length) : Problem definition
-        """
-        N_o = self.get_obstacles() #obstacle set
-        X_i = self.robots.get_states()[-1] #inital robot positions for MPC problem is current state
-        X_f = self.robots.goal() #final states for robots
-        N = 20 #planning horizon
-        M =(N_o,X_i,X_f,N)
-        node_solution =self.mpc.conflict_solve(M)
-        control_inputs = self.mpc.get_velocities(node_solution)
-        
-        # control_inputs = np.array([
-        #     [1,1],
-        #     [0,0],
-        #     [1,1],
-        #     [1,0]
-        # ])
-        return control_inputs
+            """
+            tuple M(Obstacle set, Initial robot positions, Final robot positions, Horizon length) : Problem definition
+            """
+            N_o = self.get_obstacles() #obstacle set
+            X_i = self.robots.get_states()[-1] #inital robot positions for MPC problem is current state
+            X_f = self.robots.goal() #final states for robots
+            X_h = self.peds.get_states()[0][-1]#initial human positions for MPC is current state
+            N = 20 #planning horizon
+            M =(N_o,X_i,X_f,X_h,N)
+            node_solution =self.mpc.conflict_solve(M)
+            control_inputs = self.mpc.get_velocities(node_solution)
+            
+            # control_inputs = np.array([
+            #     [1,1],
+            #     [0,0],
+            #     [1,1],
+            #     [1,0]
+            # ])
+            return control_inputs
 #robot_0 purple
 #robot_1 blue
 #robot_2 green
