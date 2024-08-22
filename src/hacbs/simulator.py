@@ -66,7 +66,7 @@ class Simulator:
             for p_o in obstacle_poses:
                 self.grid_env.set_occupancy(p_o[0],p_o[1],True)
     
-        self.grid_env.inflate_obstacles(0.35)
+        self.grid_env.inflate_obstacles(0.5)
         #generate reference paths
         self.reference_paths =[]
         conflict_found = True
