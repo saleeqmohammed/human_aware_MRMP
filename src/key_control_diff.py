@@ -28,7 +28,7 @@ def main():
     rospy.init_node('keyboard_control')
 
     # Use namespaces to send commands to the correct robot
-    robot_ns = rospy.get_namespace()
+    robot_ns = 'tb3_0'#rospy.get_namespace()
     cmd_vel_pub = rospy.Publisher(robot_ns + 'cmd_vel', Twist, queue_size=10)
 
     twist = Twist()

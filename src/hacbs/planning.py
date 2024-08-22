@@ -260,8 +260,8 @@ class CBMPC:
         self.agents =0
         self.reference_paths=reference_paths
         # Define weights
-        self.Q =3*np.diag([12.0, 12.0]) # Weight for state tracking error
-        self.R = 8*np.diag([12.0, 12.0])       # Weight for control effort
+        self.Q =10*np.diag([12.0, 12.0]) # Weight for state tracking error
+        self.R = 3*np.diag([12.0, 12.0])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5])  # Weight for goal tracking error
         #constrint parameters
         self.epsilon_g = 0.02 #goal tolerance
@@ -270,7 +270,7 @@ class CBMPC:
         self.epsilon_r = 0.08 #robot robot collision tolerance   
         self.kr = 10e6 #inter robot collision tolerance slcak coefficient
         self.ko = 10e18 #obstacle collision tolerance slack coefficient
-        self.kh = 10e8 #human robot collision tolereance slack coefficient
+        self.kh = 10e18 #human robot collision tolereance slack coefficient
         self.epsilon_o = 0.05#robot-obstacle collision tolerance
         self.epsilon_hsa = 0.05 #human robot collision tolerance
         #mpc parameters
@@ -346,6 +346,7 @@ class CBMPC:
                 obstacles_inrange.append(obstacle[min_dist_idx].tolist())
                 obstacles_inrange.append(obstacle[0].tolist())
                 obstacles_inrange.append(obstacle[-1].tolist())
+                
                 #add some more points from the same obstacle
                 obstacle_length = obstacle.shape[0]
                 sample_length = obstacle_length//10
@@ -504,8 +505,8 @@ class CBMPC:
 
         # Control bounds
         for _ in range(N):
-            lbx.extend([-1.0, -1.0])  # vx lower bound, vy lower bound
-            ubx.extend([1.0, 1])    # v upper bound, omega upper bound
+            lbx.extend([-0.5, -0.5])  # vx lower bound, vy lower bound
+            ubx.extend([0.5, 0.5])    # v upper bound, omega upper bound
 
         # Obstacle constraint bounds
         lbx.extend([0.0])  # Lower bound for delta_r

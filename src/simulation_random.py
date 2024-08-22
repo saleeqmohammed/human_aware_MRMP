@@ -28,7 +28,7 @@ def rectangle_with_diagonals(x, y, width, length):
     diagonal2 = [top_right[0], bottom_left[0], top_right[1], bottom_left[1]]  # Diagonal from top-right to bottom-left
     
     # Return the lines including the diagonals
-    return [line1, line2, line3, line4, diagonal1, diagonal2]
+    return [line1, line2, line3, line4]#, diagonal1, diagonal2]
 def generate_polygon(centroid, side_lengths):
     num_sides = len(side_lengths)
     
@@ -141,8 +141,93 @@ if __name__ == "__main__":
     # hex1 = generate_polygon()
     #put the items together to generate a problem                        
     # items = generate_random_env(n_items=4)
-    items=[box1,pent1,box4,box2,box5,box6]#,box2,box3,box4,pent1]
+    # items=[box1,pent1,box4,box2,box5,box6]#,box2,box3,box4,pent1]
     
+    #Items for scenario 1
+    items_scn_1=[
+    rectangle_with_diagonals(x=0,y=9,width=3,length=1),
+    rectangle_with_diagonals(x=0,y=7,width=3,length=1),
+    rectangle_with_diagonals(x=3,y=3,width=1,length=1),
+    rectangle_with_diagonals(x=3,y=-3,width=1,length=1),
+    rectangle_with_diagonals(x=-7,y=1,width=2,length=2),
+    rectangle_with_diagonals(x=-7,y=-2,width=2,length=2),
+    rectangle_with_diagonals(x=5,y=-9,width=3,length=2)
+    
+    ]
+    #Initial robot_state scenario 1
+    initial_robot_state_scn_1=np.array(
+        [
+            #x y vx vy gx gy 
+            [-7,8,0.5,-0.5,0,-9],
+            # [7,8,0,-0.5,5,-6],
+            [-7,-9,0.5,0.5,1,3]
+        ]
+    )
+    initial_ped_state_scn_1=np.array(
+        [
+            [-5,1,0.5,0,3,1],
+            [3,-1,-0.5,0,-5,-1],
+            [6,-7,0,0.5,4,3]
+        ]
+    )
+
+    #Items for scenario2 
+    items_scn_2=[
+        rectangle_with_diagonals(7,7,2,2),
+        rectangle_with_diagonals(3,0,1,1),
+        rectangle_with_diagonals(-3,0,1,1),
+    
+        generate_polygon((-7,-7),[2,2,3,3,3]),
+        rectangle_with_diagonals(x=7,y=-9,width=5,length=2),
+        rectangle_with_diagonals(x=-5,y=9,width=6,length=1),
+        
+    ]
+    initial_robot_state_scn_2=np.array(
+        [
+            [-2,6,0.5,-0.5,3,-9],
+            [-3,-9,0.5,0,7,5]
+        ]
+    )
+    initial_ped_state_scn_2=np.array(
+        [
+            [-3,-1,-0.5,-0.5,3,-6],
+            [4,-1,-0.5,-0.5,-3,-8],
+            
+        ]
+    )
+    # groups=[[0,1]]
+
+    #items for scenario 3
+    items_scn_3=[
+        rectangle_with_diagonals(5,0,2.5,4),
+        rectangle_with_diagonals(-5,0,2,4),
+        rectangle_with_diagonals(-9,5,1,5),
+        rectangle_with_diagonals(0,10,6,1),
+        rectangle_with_diagonals(10,10,1,1),
+        rectangle_with_diagonals(-7,-7,3,2),
+        generate_polygon((8,-9),[2,2,2,1,2,2]),
+        [[-6,-4,0,0],[-4,4,5,5],[-4,4,5.1,5.1]]
+
+
+    ]
+    initial_robot_state_scn_3=np.array(
+        [
+            [2,6,0.5,-0.5,3,-9],
+            [-3,-9,0.5,0,7,5],
+            [-7.4,-3,0.5,0,1,7]
+        ]
+    )
+    initial_ped_state_scn_3=np.array(
+        [
+            [-3,-1,-0.5,-0.5,5,10],
+            [4,-3,-0.5,-0.5,-3,-3],
+            
+            
+        ]
+    )
+    initial_robot_state = initial_robot_state_scn_3
+    initial_ped_state = initial_ped_state_scn_3
+    items = items_scn_3
     #put all the walls
     for wall in walls:
         print(f"wall {wall}")
@@ -220,7 +305,7 @@ if __name__ == "__main__":
         #                 break
 
    
-
+    
     # initiate the simulator,
     s = hs.Simulator(
         initial_ped_state,
@@ -230,7 +315,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("simulation.toml"),
     )
     # update 80 steps
-    s.step(60)
+    s.step(50)
     human_colors = len(initial_ped_state)*['red']
     with hs.plot.SceneVisualizer(scene=s,output= "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output",agent_colors=human_colors) as sv:
         sv.animate()

@@ -9,7 +9,7 @@ if __name__ == "__main__":
         [
             [2.0, -6.0, 0.5, -0.5, -3.0, 7.0], #blue
             [-4.5, 4.0, -0.5, 0.0, 5, -5.0], #cyan
-            # [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
+            [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
             # [1.0, 0.0, 0.0, 0.5, 2.0, 10.0],
             # [2.0, 0.0, 0.0, 0.5, 3.0, 10.0],
             # [3.0, 0.0, 0.0, 0.5, 4.0, 10.0],
@@ -21,9 +21,9 @@ if __name__ == "__main__":
     initial_robot_state = np.array(
         [
             #Warehouse config
-            # [5.0, 5.0,0.5,0.5,-7,0], #robot 1
+            [5.0, 5.0,0.5,0.5,-7,0], #robot 1
             [10, -5,0.5,0.5,-2.0,5.0],#robot 2
-            # [-10, 0.0,0.5,0.5,10,0], #robot 3
+            [-10, 0.0,0.5,0.5,10,0], #robot 3
             [-10.0, -5.0,0.5,0.5,5,5] #robot 4
             
             #crossover config
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("simulation.toml"),
     )
     # update 80 steps
-    s.step(60)
+    s.step(20)
 
     with hs.plot.SceneVisualizer(s, "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output2") as sv:
         sv.animate()
