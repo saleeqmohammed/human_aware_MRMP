@@ -37,7 +37,27 @@ class GridEnvironment:
         """Set the occupancy of the cell containing (x, y)."""
         row, col = self._get_cell_indices(x, y)
         self.occupancy_grid[row, col] = occupied
+    def is_within_bounds(self,x,y):
+        is_within_bounds= True
+        if x <= self.min_x or x>= self.max_x:
+            is_within_bounds = False
+        if y<= self.min_y or y>=self.max_y:
+            is_within_bounds = False
+        return is_within_bounds
     
+    def block_range(self, center_x, center_y, radius):
+        """Block cells within a given radius around a center point (center_x, center_y)."""
+        center_row, center_col = self._get_cell_indices(center_x, center_y)
+        inflation_cells = int(np.ceil(radius / self.grid_size))
+
+        for row in range(center_row - inflation_cells, center_row + inflation_cells + 1):
+            for col in range(center_col - inflation_cells, center_col + inflation_cells + 1):
+                if 0 <= row < self.num_rows and 0 <= col < self.num_cols:
+                    # Calculate the actual distance from the center in grid units
+                    cell_center_x, cell_center_y = self.get_cell_center(row, col)
+                    if np.linalg.norm(np.array([cell_center_x, cell_center_y]) - np.array([center_x, center_y])) <= radius:
+                        self.set_occupancy(cell_center_x, cell_center_y, True)
+
     def _get_cell_indices(self, x, y):
         """Convert (x, y) coordinates to grid cell indices."""
         col = int((x - self.min_x) // self.grid_size)
@@ -492,8 +512,8 @@ class CBMPC:
 
         # Control bounds
         for _ in range(N):
-            lbx.extend([-0.5, -np.pi / 4])  # v lower bound, omega lower bound
-            ubx.extend([0.5, np.pi / 4])    # v upper bound, omega upper bound
+            lbx.extend([-1, -np.pi / 4])  # v lower bound, omega lower bound
+            ubx.extend([1, np.pi / 4])    # v upper bound, omega upper bound
 
         # Obstacle constraint bounds
         lbx.extend([0.0])  # Lower bound for delta_r
