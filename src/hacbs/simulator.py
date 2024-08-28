@@ -57,7 +57,8 @@ class Simulator:
         self.robots = RobotState(robot_state,self.config)
         # construct forces
         self.forces = self.make_forces(self.config)
-
+        self.solution_time = 0
+        self.agent_sol_times_total =np.zeros(len(robot_state))
         #descretization for planner
         min_x, max_x, min_y, max_y, grid_size = -15, 15, -15, 15, 0.25 
         self.grid_env = GridEnvironment(min_x,max_x,min_y,max_y,grid_size)
@@ -117,13 +118,14 @@ class Simulator:
         else:
             print("feasible global plan found")
         #setup CB-MPC
-        self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=30)
+        self.mpc = CBMPC(obstacles=obstacles,reference_paths=self.reference_paths,N=20)
 
 
 
         
     
     def calculte_u (self):
+        t_solver_start = time.monotonic()
         """
         tuple M(Obstacle set, Initial robot positions, Final robot positions, Horizon length) : Problem definition
         """
@@ -133,7 +135,7 @@ class Simulator:
         X_h = self.peds.get_states()[0][-1]#initial human positions for MPC is current state
         N = 20 #planning horizon
         M =(N_o,X_i,X_f,X_h,N)
-        node_solution =self.mpc.conflict_solve(M)
+        node_solution,agent_sol_times =self.mpc.conflict_solve(M)
         control_inputs = self.mpc.get_velocities(node_solution)
         
         # control_inputs = np.array([
@@ -142,6 +144,12 @@ class Simulator:
         #     [1,1],
         #     [1,0]
         # ])
+        t_solver_end = time.monotonic()
+        sol_time = t_solver_end-t_solver_start
+        self.solution_time+=sol_time
+        self.agent_sol_times_total+=agent_sol_times
+        print(f"solution_time: {self.solution_time}")
+        print(f"robot solve time {self.agent_sol_times_total}")
         return control_inputs
 #robot_0 purple
 #robot_1 blue
@@ -200,13 +208,24 @@ class Simulator:
 
     def move_robot(self):
         """Move the robot one step"""
+        stat =True
+        X_i = self.robots.get_states()[-1] #inital robot positions for MPC problem is current state
+        X_f = self.robots.goal() #final states for robots
+        if np.max(np.linalg.norm(X_f-X_i[:,:2],axis=1)) <= 1:
+            stat = False
         self.robots.step(vel=self.calculte_u())
         #Generete reference paths for robots
+        return stat
 
  
     def step(self, n=1):
         """Step n time"""
         for _ in range(n):
             self.step_once() #pedestrian step update
-            self.move_robot() #Robot step update
+            stat =self.move_robot() #Robot step update
+            if not stat:
+                break  
+        occuppancy = self.grid_env.occupancy_grid
+        occuppancy_fraction = np.sum(occuppancy)/occuppancy.size
+        print(f"grid occupancy: {100*occuppancy_fraction}%")
         return self

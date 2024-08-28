@@ -211,6 +211,7 @@ class Node:
         distance_matrix = np.linalg.norm(difference_matrix,axis=2)
         bool_filter = distance_matrix >= self.HSA + delta_h
         h_collision_tidx,h_idx =np.where(bool_filter==False)
+        return [],[]
         return h_collision_tidx,h_idx
     def conflicts(self):
         """  
@@ -259,6 +260,7 @@ class CBMPC:
         self.N = N 
         self.agents =0
         self.reference_paths=reference_paths
+        self.robot_sol_times=[0, 0 , 0]
         # Define weights
         self.Q =10*np.diag([12.0, 12.0]) # Weight for state tracking error
         self.R = np.diag([12.0, 12.0])       # Weight for control effort
@@ -650,6 +652,7 @@ class CBMPC:
         delta_r_solution = sol_x[-3]  # Extract delta_r
         delta_o_solution = sol_x[-2]  # Extract delta_o
         delta_h_solution = sol_x[-1] #TODO: Extract delta_h
+        self.robot_sol_times[a_i]+=solver.stats()['t_wall_total']
 
 
 
@@ -713,6 +716,7 @@ class CBMPC:
         Output: Conllision Free trajectories P.solution
         """
         self.agents = len(np.squeeze(M[1]))
+        self.robot_sol_times = np.zeros(self.agents)
         goals = np.squeeze(M[2]) #X_f
         print(f"number of agents:{self.agents}")
         R = Node(self.epsilon_r,self.epsilon_o,self.D)
@@ -737,7 +741,7 @@ class CBMPC:
         while(True):
             P = self.o_list.pop(0)
             if len(P.conflicts()) ==0:
-                return P.solution
+                return P.solution, self.robot_sol_times
             C = P.conflicts()[0] #first conflict
             a_i,a_j = C[0],C[1]
 

@@ -188,7 +188,7 @@ if __name__ == "__main__":
     # initial states, each entry is the position, velocity and goal of a pedestrian in the form of (px, py, vx, vy, gx, gy)
     initial_ped_state = np.array(
         [
-            # [2.0, -6.0, 0.5, -0.5, -3.0, 7.0], #blue
+            [2.0, -6.0, 0.5, -0.5, -3.0, 7.0], #blue
             [-4.5, 4.0, -0.5, 0.0, 5, -5.0], #cyan
             # [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
             # [1.0, 0.0, 0.0, 0.5, 2.0, 10.0],
@@ -201,234 +201,26 @@ if __name__ == "__main__":
     groups=[]
     initial_robot_state = np.array(
         [
-            #Warehouse config
-            [5.0, 5.0,0.5,0.5,-7,0], #robot 1
-            # [10, -5,0.5,0.5,-2.0,5.0],#robot 2
-            [-10, 0.0,0.5,0.5,10,0], #robot 3
-            # [-10.0, -5.0,0.5,0.5,5,5] #robot 4
+
             
             #crossover config
-            # [-8,0,0.5,0,8,0],
-            # [8,0,-0.5,0,-8,0]
+            [-8,0,0.5,0,8,0],#left
+            [8,0,-0.5,0,-8,0],#right
+            [0,8.0,0,-0.5,0,-8],#top
+            # [0,-8,0,0.5,0,8]#bottom
         ]
     )
-    obs =np.load('/home/saleeq/Projects/PySocialForce/pysocialforce/line_endpoints.npy')
-    map_endpoint_resolution =0.060 #m/pix
+ 
 
 
-
-    #obstacle border lines
-    # obs = (obs -np.mean(obs))*map_endpoint_resolution+[1,1,2,2]
-    obs = []
-    def generate_random_env(n_items):
-        items=[]
-        for _ in range(n_items):
-            width =random.randint(1,10)
-            height = random.randint(1,10)
-            x = random.randint(math.ceil(-12+width/2) ,math.floor(12-width/2))
-            y = random.randint(math.ceil(-12+height/2),math.floor(12-height/2))
-            box = rectangle_with_diagonals(x,y=y,width=width,length=height)
-            items.append(box)
-        return items
-
-
-    #Define walls
-    walls = np.array([
-        # [-12,12,12,12],
-        # [12,12,-12,12],
-        # [-12,12,-12,-12],
-        # [-12,-12,-12,12],
-      
-    ])  
+ 
     
-    #create an inventry of items
-    box1 = rectangle_with_diagonals(x=0,y=0,width=2,length=2)
-    box2 = rectangle_with_diagonals(x=-5, y=8, width=8, length=2)
-    box3 = rectangle_with_diagonals(x=5,y=-5,width=6,length=4)
-    box4 = rectangle_with_diagonals(x=-7,y=8,width=2,length=2)
-    box5 = rectangle_with_diagonals(x=6,y=-8,width=1,length=4,)
-    box6 = rectangle_with_diagonals(x=4,y=-8,width=1,length=4,)
-    pent1 = generate_polygon((5,5),[2,4,5,3])
-    # hex1 = generate_polygon()
-    #put the items together to generate a problem                        
-    # items = generate_random_env(n_items=4)
-    # items=[box1,pent1,box4,box2,box5,box6]#,box2,box3,box4,pent1]
-    
-    #Items for scenario 1
-    items_scn_1=[
-    rectangle_with_diagonals(x=0,y=9,width=3,length=1),
-    rectangle_with_diagonals(x=0,y=7,width=3,length=1),
-    rectangle_with_diagonals(x=3,y=3,width=1,length=1),
-    rectangle_with_diagonals(x=3,y=-3,width=1,length=1),
-    rectangle_with_diagonals(x=-7,y=1,width=2,length=2),
-    rectangle_with_diagonals(x=-7,y=-2,width=2,length=2),
-    rectangle_with_diagonals(x=5,y=-9,width=3,length=2)
-    
-    ]
-    #Initial robot_state scenario 1
-    initial_robot_state_scn_1=np.array(
-        [
-            #x y vx vy gx gy 
-            [-7,8,0.5,-0.5,0,-9],
-            # [7,8,0,-0.5,5,-6],
-            [-7,-9,0.5,0.5,1,3]
-        ]
-    )
-    initial_ped_state_scn_1=np.array(
-        [
-            [-5,1,0.5,0,3,1],
-            [3,-1,-0.5,0,-5,-1],
-            # [6,-7,0,0.5,4,3]
-        ]
-    )
-
-    #Items for scenario2 
-    items_scn_2=[
-        rectangle_with_diagonals(7,7,2,2),
-        rectangle_with_diagonals(3,0,1,1),
-        rectangle_with_diagonals(-3,0,1,1),
-    
-        generate_polygon((-7,-7),[2,2,3,3,3]),
-        rectangle_with_diagonals(x=7,y=-9,width=5,length=2),
-        rectangle_with_diagonals(x=-5,y=9,width=6,length=1),
-        
-    ]
-    initial_robot_state_scn_2=np.array(
-        [
-            [-2,6,0.5,-0.5,3,-9],
-            [-3,-9,0.5,0,7,5]
-        ]
-    )
-    initial_ped_state_scn_2=np.array(
-        [
-            [-3,-1,-0.5,-0.5,3,-6],
-            [4,-1,-0.5,-0.5,-3,-8],
-            
-        ]
-    )
-    # groups=[[0,1]]
-
-    #items for scenario 3
-    items_scn_3=[
-        rectangle_with_diagonals(5,0,2.5,4),
-        rectangle_with_diagonals(-5,0,2,4),
-        rectangle_with_diagonals(-9,5,1,5),
-        rectangle_with_diagonals(0,10,6,1),
-        rectangle_with_diagonals(10,10,1,1),
-        rectangle_with_diagonals(-7,-7,3,2),
-        generate_polygon((8,-9),[2,2,2,1,2,2]),
-        [[-6,-4,0,0],[-4,4,5,5],[-4,4,5.1,5.1]]
-
-
-    ]
-    initial_robot_state_scn_3=np.array(
-        [
-            [2,6,0.5,-0.5,3,-9],
-            [-3,-9,0.5,0,7,5],
-            [-7.4,-3,0.5,0,1,7]
-        ]
-    )
-    initial_ped_state_scn_3=np.array(
-        [
-            [-3,-1,-0.5,-0.5,5,10],
-            [4,-3,-0.5,-0.5,-3,-3],
-            
-            
-        ]
-    )
-    initial_robot_state = initial_robot_state_scn_1
-    initial_ped_state = initial_ped_state_scn_1
-    items = items_scn_1
-    #put all the walls
-    for wall in walls:
-        print(f"wall {wall}")
-        obs.append(wall)
-
-    for item in items:
-        for line in item:
-            print(f"Obstacle line added: {line}")
-            obs.append(line)
-
-    obs = np.array(obs)
-
-    # obs = get_checkerboard_lines(generate_obstacles(3))
-    obstacles=generate_obstacles(3)
+   
+    obstacles=[]
     obs = get_obstacle_lines(obstacles)
     n_robots =2
     n_humans= 2
-    movers =generate_agents(num_agents=n_robots+n_humans,obstacles=obstacles)
-    initial_ped_state = movers[:n_humans,:]
-    initial_robot_state=movers[n_robots:,:]
-    # area =calculate_total_area(obstacles)
-    # occ = np.round((area/(30**2))*100,2)
-    # print(f"OCCUPPANCY:{occ}")
-    '''
-    Check feasibility of the arrangement
-    '''
-    env = EnvState(obstacles=obs,resolution=10)
-    min_x, max_x, min_y, max_y, grid_size = -15, 15, -15, 15, 0.25 
-    grid_env = GridEnvironment(min_x,max_x,min_y,max_y,grid_size)
-    #set occuppancy for obstacles
-    for obstacle_poses in env.obstacles:
-        for p_o in obstacle_poses:
-            grid_env.set_occupancy(p_o[0],p_o[1],True)
-
-    #inflate obstacles
-    grid_env.inflate_obstacles(0.6)
-    occuppancy = grid_env.occupancy_grid
-    occuppancy_fraction = np.sum(occuppancy)/occuppancy.size
-    print(f"grid occupancy: {100*occuppancy_fraction}%")
-        #     reference_paths =[]
-        #     #plan paths
-        #     for i in range(len(initial_robot_state)):
-        #         robot = initial_robot_state[i]
-        #         start = (robot[0],robot[1])
-        #         goal = (robot[4],robot[5])
-        #         path = grid_env.a_star(start,goal)
-        #         reference_paths.append(path)
-        #     return grid_env,obs,reference_paths
-        # grid_env,obs,reference_paths =generate_problem()
-  
-        # for path in reference_paths:
-        #     if len(path) <1:
-        #         generate_problem()
-
-        # n_itr = 1000
-        # while conflict_found:
-        #     conflict_found = False
-        #     n_itr+=1
-        #     #replan paths
-        #     for i in range(len(initial_robot_state)):
-        #         path = reference_paths[i]
-        #         #check conflict with previous paths  
-        #         for j in range(i):
-        #             other_path = reference_paths[j]
-        #             for step in range(min(len(path),len(other_path))):
-        #                 if np.linalg.norm(np.array(path[step])-np.array(other_path[step])) < 0.7:
-        #                     conflict_found = True
-        #                     conflict_time = step
-        #                     conflict_pos = path[step]
-
-        #                     #block the conflicting cell at conflicting time
-        #                     occuppancy = grid_env.occupancy_grid
-
-        #                     x,y= conflict_pos
-        #                     grid_env.block_range(x,y,1.0)
-        #                     path = grid_env.a_star(start,goal)
-        #                     reference_paths[i] = path
-
-        #                     grid_env.occupancy_grid = occuppancy
-        #                     # grid_env.inflate_obstacles(0.2)
-
-        #                     break
-        #                 else:
-        #                     conflict_found = False
-        #             if conflict_found:
-        #                 break
-
-   
     
-    # initiate the simulator,
     s = hs.Simulator(
         initial_ped_state,
         initial_robot_state,

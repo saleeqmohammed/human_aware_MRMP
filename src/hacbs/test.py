@@ -1,76 +1,87 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
-def generate_polygon(centroid, side_lengths):
-    num_sides = len(side_lengths)
-    
-    if num_sides < 3:
-        raise ValueError("A polygon must have at least 3 sides")
-    
-    # Centroid coordinates
-    cx, cy = centroid
-    
-    # Calculate the angle between each vertex (in radians)
-    angles = np.linspace(0, 2 * np.pi, num_sides + 1)[:-1]
-    
-    # Initialize the list of vertices
-    vertices = []
-    
-    # Initial angle (can start from any angle, here we start from 0)
-    current_angle = 0
-    
-    # Calculate each vertex based on the centroid, angle, and side length
-    for i in range(num_sides):
-        length = side_lengths[i % len(side_lengths)]  # If side_lengths has fewer elements, it will repeat
-        # Compute the position of the vertex
-        x = cx + length * np.cos(current_angle)
-        y = cy + length * np.sin(current_angle)
-        vertices.append((x, y))
+def is_overlapping(rect1, rect2):
+    xmin1, xmax1, ymin1, ymax1 = rect1
+    xmin2, xmax2, ymin2, ymax2 = rect2
+    return not (xmax1 <= xmin2 or xmax2 <= xmin1 or ymax1 <= ymin2 or ymax2 <= ymin1)
+
+def generate_obstacles(num_obstacles, x_range=(-10, 10), y_range=(-10, 10), size_range=(1, 5)):
+    obstacles = []
+    max_attempts = 1000
+
+    for _ in range(num_obstacles):
+        attempts = 0
+        placed = False
+        while not placed and attempts < max_attempts:
+            width = np.random.uniform(size_range[0], size_range[1])
+            height = np.random.uniform(size_range[0], size_range[1])
+            xmin = np.random.uniform(x_range[0], x_range[1] - width)
+            xmax = xmin + width
+            ymin = np.random.uniform(y_range[0], y_range[1] - height)
+            ymax = ymin + height
+
+            new_obstacle = [xmin, xmax, ymin, ymax]
+            if all(not is_overlapping(new_obstacle, obs) for obs in obstacles):
+                obstacles.append(new_obstacle)
+                placed = True
+            attempts += 1
         
-        # Update the angle for the next vertex
-        if i < num_sides - 1:
-            next_length = side_lengths[(i + 1) % len(side_lengths)]
-            # Compute the angle for the next vertex using the cosine rule
-            angle_increment = np.arccos((length**2 + next_length**2 - length**2) / (2 * length * next_length))
-            current_angle += angle_increment
-    
-    # Form the polygon by connecting vertices
-    polygon_edges = []
-    for i in range(num_sides):
-        x1, y1 = vertices[i]
-        x2, y2 = vertices[(i + 1) % num_sides]
-        polygon_edges.append([x1, x2, y1, y2])
-    
-    return vertices, polygon_edges
+        if attempts >= max_attempts:
+            print("Warning: Unable to place obstacle after many attempts.")
 
-def plot_polygon(vertices, centroid):
-    # Unzip the list of vertices into two lists: one for x-coordinates and one for y-coordinates
-    x_coords, y_coords = zip(*vertices)
+    return obstacles
+
+def get_checkerboard_lines(obstacles, interval=0.5):
+    lines = []
+    for obstacle in obstacles:
+        xmin, xmax, ymin, ymax = obstacle
+        # Generate vertical lines
+        x = xmin
+        while x <= xmax:
+            lines.append([x, x, ymin, ymax])
+            x += interval
+        # Generate horizontal lines
+        y = ymin
+        while y <= ymax:
+            lines.append([xmin, xmax, y, y])
+            y += interval
+    return lines
+
+def plot_obstacles_with_checkerboard(obstacles, lines, x_range=(-10, 10), y_range=(-10, 10)):
+    fig, ax = plt.subplots()
     
-    # Create the plot
-    plt.figure(figsize=(6, 6))
+    # Set plot limits
+    ax.set_xlim(x_range)
+    ax.set_ylim(y_range)
     
-    # Plot the edges of the polygon
-    plt.plot(x_coords + (x_coords[0],), y_coords + (y_coords[0],), 'b-', marker='o', label='Polygon Edges')
+    # Add obstacles to the plot
+    for obstacle in obstacles:
+        xmin, xmax, ymin, ymax = obstacle
+        rect = patches.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, linewidth=1, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
     
-    # Plot the centroid
-    plt.plot(centroid[0], centroid[1], 'ro', label='Centroid')
+    # Add checkerboard lines to the plot
+    for line in lines:
+        x1, x2, y1, y2 = line
+        ax.plot([x1, x2], [y1, y2], color='b', linestyle='--', linewidth=0.5)
     
-    # Set plot limits and title
-    plt.xlim(min(x_coords) - 1, max(x_coords) + 1)
-    plt.ylim(min(y_coords) - 1, max(y_coords) + 1)
-    plt.title('Generated Polygon')
+    ax.set_xlabel('X-axis (meters)')
+    ax.set_ylabel('Y-axis (meters)')
+    ax.set_title('Obstacles with Checkerboard Pattern')
     
-    # Add grid and legend
     plt.grid(True)
-    plt.legend()
-    
-    # Show the plot
     plt.show()
 
-# Example usage
-centroid = (0, 0)
-side_lengths = [5, 5, 5, 5, 5]  # For a regular pentagon
+# Parameters
+num_obstacles = 5
+obstacles = generate_obstacles(num_obstacles)
+checkerboard_lines = get_checkerboard_lines(obstacles, interval=0.5)
 
-vertices, polygon_edges = generate_polygon(centroid, side_lengths)
-plot_polygon(vertices, centroid)
+# Print the checkerboard lines for each obstacle
+for i, line in enumerate(checkerboard_lines):
+    print(f"Line {i + 1}: {line}")
+
+# Plot the obstacles with checkerboard pattern
+plot_obstacles_with_checkerboard(obstacles, checkerboard_lines)

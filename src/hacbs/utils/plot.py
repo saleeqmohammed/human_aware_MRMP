@@ -275,7 +275,7 @@ class SceneVisualizer:
 
     def animation_update(self, i):
         self.plot_groups(i)
-        self.plot_human(i)
+        # self.plot_human(i)
         self.plot_robots(i)
-        self.plot_ellipses(i)
+        # self.plot_ellipses(i)
         return (self.group_collection, self.human_collection, self.ellipse_collection)
