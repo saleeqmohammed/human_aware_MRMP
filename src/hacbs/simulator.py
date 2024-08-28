@@ -100,7 +100,7 @@ class Simulator:
                             x,y= conflict_pos
                             occuppancy = self.grid_env.occupancy_grid
 
-                            self.grid_env.block_range(center_x=x,center_y=y,radius=1.5)
+                            self.grid_env.block_range(center_x=x,center_y=y,radius=0.2)
                             path = self.grid_env.a_star(start,goal)
                             self.reference_paths[i] = path
 
