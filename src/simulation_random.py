@@ -225,9 +225,9 @@ if __name__ == "__main__":
             
         ]
     )
-    initial_robot_state = initial_robot_state_scn_3
-    initial_ped_state = initial_ped_state_scn_3
-    items = items_scn_3
+    initial_robot_state = initial_robot_state_scn_1
+    initial_ped_state = initial_ped_state_scn_1
+    items = items_scn_1
     #put all the walls
     for wall in walls:
         print(f"wall {wall}")
@@ -317,6 +317,6 @@ if __name__ == "__main__":
     # update 80 steps
     s.step(50)
     human_colors = len(initial_ped_state)*['red']
-    with hs.plot.SceneVisualizer(scene=s,output= "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output",agent_colors=human_colors) as sv:
+    with hs.plot.SceneVisualizer(scene=s,output= "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output_demo",agent_colors=human_colors) as sv:
         sv.animate()
         # sv.plot()

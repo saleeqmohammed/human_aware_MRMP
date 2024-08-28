@@ -261,16 +261,16 @@ class CBMPC:
         self.reference_paths=reference_paths
         # Define weights
         self.Q =10*np.diag([12.0, 12.0]) # Weight for state tracking error
-        self.R = 3*np.diag([12.0, 12.0])       # Weight for control effort
+        self.R = np.diag([12.0, 12.0])       # Weight for control effort
         self.P_term = np.diag([12.5,12.5])  # Weight for goal tracking error
         #constrint parameters
         self.epsilon_g = 0.02 #goal tolerance
         self.D = 1.04 #robot footprint
-        self.HSA = 1.1 #human safety area
+        self.HSA = 1 #human safety area
         self.epsilon_r = 0.08 #robot robot collision tolerance   
         self.kr = 10e6 #inter robot collision tolerance slcak coefficient
-        self.ko = 10e18 #obstacle collision tolerance slack coefficient
-        self.kh = 10e18 #human robot collision tolereance slack coefficient
+        self.ko = 10e6 #obstacle collision tolerance slack coefficient
+        self.kh = 10e6 #human robot collision tolereance slack coefficient
         self.epsilon_o = 0.05#robot-obstacle collision tolerance
         self.epsilon_hsa = 0.05 #human robot collision tolerance
         #mpc parameters

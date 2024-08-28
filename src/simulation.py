@@ -7,7 +7,7 @@ if __name__ == "__main__":
     # initial states, each entry is the position, velocity and goal of a pedestrian in the form of (px, py, vx, vy, gx, gy)
     initial_ped_state = np.array(
         [
-            [2.0, -6.0, 0.5, -0.5, -3.0, 7.0], #blue
+            # [2.0, -6.0, 0.5, -0.5, -3.0, 7.0], #blue
             [-4.5, 4.0, -0.5, 0.0, 5, -5.0], #cyan
             [6.0, 1.0, 0.0, 0.5, -5.0, 2.0], #yellow
             # [1.0, 0.0, 0.0, 0.5, 2.0, 10.0],
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("simulation.toml"),
     )
     # update 80 steps
-    s.step(20)
+    s.step(4)
 
     with hs.plot.SceneVisualizer(s, "/home/saleeq/catkin_ws/src/human_aware_MRMP/images/output2") as sv:
         sv.animate()
