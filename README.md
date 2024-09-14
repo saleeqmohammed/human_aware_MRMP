@@ -13,17 +13,9 @@ The methodology for this work mainly takes inspiration from on the CB-MPC model 
 <img src="images/output_01.gif"  width="250" style="display:inline-block; margin-right: 10px"/>
 
 We use an MPC formulation of the following form.
-$$
-    argmin_{u_i,x_i,\delta_r,\delta_o,\delta_h} J_i = \sum^{k+N-1}_{l=k} \Big[(x^l_i-r^l_i)^T Q (x^l_i - r^l_i) + u^{l,T}_i R u^l_i \Big] + (x_i^{k+N,T} - x_i^d) P (x_i^{k+N} - x_i^d)+ k_r \delta_r + k_o \delta_o + k_h \delta_h
-$$
-This minimisation is subject to,
-$$
-\begin{align}
-    x^k_i &\in X_0 \quad \text{and} \quad x^{k+N}_i \in X_f \\
-    x^l_i &\in X_{\text{feasible}} \quad \text{and} \quad u^l_i \in U_{\text{feasible}} \\
-    \delta_r, \delta_o, \delta_h &\geq 0
-\end{align}
-$$
+
+![objective fucntion](images/objective.png)
+
 Solution illustration:
 
 <img src="images/animation0.gif"  width="300" />
